@@ -1,0 +1,662 @@
+/**
+ * User dashboard styles
+ *
+ * @package    SkillSprint
+ * @subpackage SkillSprint/public/css
+ */
+
+/* Dashboard Container */
+.skillsprint-dashboard {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    display: grid;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    gap: 30px;
+    grid-template-columns: 1fr 320px;
+    margin: 30px auto;
+    padding: 30px;
+}
+
+@media (max-width: 992px) {
+    .skillsprint-dashboard {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Dashboard Welcome Area */
+.skillsprint-dashboard-welcome {
+    align-items: center;
+    background: linear-gradient(135deg, var(--skillsprint-primary), var(--skillsprint-secondary));
+    border-radius: 8px;
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 30px;
+    padding: 25px 30px;
+}
+
+.skillsprint-dashboard-welcome h2 {
+    color: white;
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.skillsprint-streak-info {
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    display: flex;
+    padding: 8px 15px;
+}
+
+.skillsprint-streak-count {
+    font-size: 22px;
+    font-weight: 700;
+    margin-right: 5px;
+}
+
+.skillsprint-streak-label {
+    font-size: 14px;
+    margin-right: 5px;
+}
+
+.skillsprint-streak-fire {
+    font-size: 20px;
+}
+
+/* Dashboard Main Content */
+.skillsprint-dashboard-main {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+/* Dashboard Section */
+.skillsprint-dashboard-section {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    padding: 25px;
+}
+
+.skillsprint-dashboard-section-title {
+    border-bottom: 1px solid #eee;
+    font-size: 18px;
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+}
+
+/* Blueprint Cards */
+.skillsprint-blueprint-cards {
+    display: grid;
+    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+
+.skillsprint-card {
+    background-color: white;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.skillsprint-card:hover {
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    transform: translateY(-2px);
+}
+
+.skillsprint-card-img {
+    height: 160px;
+    object-fit: cover;
+    width: 100%;
+}
+
+.skillsprint-card-content {
+    padding: 20px;
+}
+
+.skillsprint-card-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.skillsprint-card-text {
+    color: #555;
+    font-size: 14px;
+    margin-bottom: 15px;
+}
+
+.skillsprint-progress-bar-container {
+    background-color: #f1f1f1;
+    border-radius: 4px;
+    height: 8px;
+    margin-bottom: 10px;
+    overflow: hidden;
+    width: 100%;
+}
+
+.skillsprint-progress-bar {
+    background-color: var(--skillsprint-success);
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.skillsprint-progress-text {
+    color: #666;
+    display: flex;
+    font-size: 13px;
+    justify-content: space-between;
+}
+
+.skillsprint-completion-date {
+    color: #666;
+    font-size: 13px;
+    margin-top: 10px;
+}
+
+.skillsprint-card-footer {
+    align-items: center;
+    background-color: #f9f9f9;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    padding: 15px 20px;
+}
+
+/* View All Link */
+.skillsprint-view-all {
+    color: var(--skillsprint-primary);
+    display: inline-block;
+    font-size: 14px;
+    margin-top: 15px;
+    text-decoration: none;
+}
+
+.skillsprint-view-all:hover {
+    text-decoration: underline;
+}
+
+/* Category/Difficulty Filters */
+.skillsprint-browse-categories,
+.skillsprint-browse-difficulties {
+    margin-bottom: 20px;
+}
+
+.skillsprint-categories-list,
+.skillsprint-difficulties-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.skillsprint-category-link {
+    background-color: #f1f1f1;
+    border-radius: 20px;
+    color: #333;
+    display: inline-block;
+    font-size: 14px;
+    padding: 6px 14px;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.skillsprint-category-link:hover {
+    background-color: var(--skillsprint-primary);
+    color: white;
+}
+
+/* Badges */
+.skillsprint-badge {
+    border-radius: 20px;
+    display: inline-block;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 4px 12px;
+    text-transform: uppercase;
+}
+
+.skillsprint-badge.beginner {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.skillsprint-badge.intermediate {
+    background-color: #fff3cd;
+    color: #664d03;
+}
+
+.skillsprint-badge.advanced {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+.skillsprint-badge.expert {
+    background-color: #cff4fc;
+    color: #055160;
+}
+
+/* Dashboard Sidebar */
+.skillsprint-dashboard-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.skillsprint-dashboard-widget {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    padding: 20px;
+}
+
+.skillsprint-dashboard-widget-title {
+    border-bottom: 1px solid #eee;
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+}
+
+/* Stats Grid */
+.skillsprint-stats-grid {
+    display: grid;
+    gap: 15px;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.skillsprint-stat-item {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+}
+
+.skillsprint-stat-value {
+    color: var(--skillsprint-primary);
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 5px;
+}
+
+.skillsprint-stat-label {
+    color: #666;
+    font-size: 13px;
+}
+
+/* Achievements */
+.skillsprint-achievements-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.skillsprint-achievement {
+    align-items: center;
+    border-bottom: 1px solid #f1f1f1;
+    display: flex;
+    padding-bottom: 15px;
+}
+
+.skillsprint-achievement:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.skillsprint-achievement-icon {
+    align-items: center;
+    background-color: var(--skillsprint-primary-light);
+    border-radius: 50%;
+    color: var(--skillsprint-primary);
+    display: flex;
+    flex-shrink: 0;
+    font-size: 18px;
+    height: 40px;
+    justify-content: center;
+    margin-right: 15px;
+    width: 40px;
+}
+
+.skillsprint-achievement-content {
+    flex-grow: 1;
+}
+
+.skillsprint-achievement-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 3px;
+}
+
+.skillsprint-achievement-description {
+    color: #666;
+    font-size: 12px;
+    margin-bottom: 3px;
+}
+
+.skillsprint-achievement-date {
+    color: #999;
+    font-size: 11px;
+}
+
+/* Leaderboard */
+.skillsprint-leaderboard-table {
+    border-collapse: collapse;
+    font-size: 14px;
+    margin-top: 10px;
+    width: 100%;
+}
+
+.skillsprint-leaderboard-table th {
+    border-bottom: 2px solid #eee;
+    color: #555;
+    font-weight: 600;
+    padding: 8px;
+    text-align: left;
+}
+
+.skillsprint-leaderboard-table td {
+    border-bottom: 1px solid #f1f1f1;
+    padding: 8px;
+}
+
+.skillsprint-leaderboard-table tr:last-child td {
+    border-bottom: none;
+}
+
+.skillsprint-leaderboard-table tr.current-user {
+    background-color: rgba(var(--skillsprint-primary-rgb), 0.05);
+}
+
+.skillsprint-leaderboard-rank {
+    color: #999;
+    font-weight: 700;
+    text-align: center;
+    width: 40px;
+}
+
+.skillsprint-leaderboard-user {
+    align-items: center;
+    display: flex;
+}
+
+.skillsprint-leaderboard-avatar {
+    border-radius: 50%;
+    height: 28px;
+    margin-right: 10px;
+    width: 28px;
+}
+
+.skillsprint-leaderboard-streak {
+    background-color: #fff3cd;
+    border-radius: 20px;
+    color: #664d03;
+    display: inline-block;
+    font-size: 11px;
+    margin-left: 8px;
+    padding: 2px 8px;
+}
+
+/* Login Required */
+.skillsprint-login-required {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    margin: 30px auto;
+    max-width: 600px;
+    padding: 30px;
+    text-align: center;
+}
+
+.skillsprint-alert {
+    border-radius: 8px;
+    margin-bottom: 20px;
+    padding: 15px 20px;
+}
+
+.skillsprint-alert.warning {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+    color: #664d03;
+}
+
+.skillsprint-alert-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 5px;
+}
+
+.skillsprint-alert-message {
+    margin-bottom: 0;
+}
+
+.skillsprint-login-buttons {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin: 25px 0;
+}
+
+.skillsprint-why-register {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin-top: 30px;
+    padding: 20px;
+    text-align: left;
+}
+
+.skillsprint-why-register h3 {
+    font-size: 16px;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.skillsprint-why-register ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.skillsprint-why-register li {
+    align-items: center;
+    display: flex;
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.skillsprint-why-register li .dashicons {
+    color: var(--skillsprint-success);
+    margin-right: 10px;
+}
+
+/* Buttons */
+.skillsprint-button {
+    background-color: var(--skillsprint-primary);
+    border: none;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    display: inline-block;
+    font-size: 14px;
+    font-weight: 500;
+    padding: 10px 16px;
+    text-align: center;
+    text-decoration: none;
+    transition: background-color 0.3s ease;
+}
+
+.skillsprint-button:hover {
+    background-color: var(--skillsprint-primary-dark);
+    color: white;
+}
+
+.skillsprint-button.secondary {
+    background-color: white;
+    border: 1px solid var(--skillsprint-primary);
+    color: var(--skillsprint-primary);
+}
+
+.skillsprint-button.secondary:hover {
+    background-color: var(--skillsprint-primary-light);
+}
+
+.skillsprint-button.small {
+    font-size: 12px;
+    padding: 6px 12px;
+}
+
+.skillsprint-button.outline {
+    background-color: transparent;
+    border: 1px solid var(--skillsprint-primary);
+    color: var(--skillsprint-primary);
+}
+
+.skillsprint-button.outline:hover {
+    background-color: var(--skillsprint-primary-light);
+}
+
+.skillsprint-button.full-width {
+    display: block;
+    width: 100%;
+}
+
+/* Modal */
+.skillsprint-modal-overlay {
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+    height: 100%;
+    left: 0;
+    overflow-y: auto;
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+.skillsprint-modal {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    margin: 50px auto;
+    max-width: 500px;
+    position: relative;
+    width: 90%;
+}
+
+.skillsprint-modal-header {
+    align-items: center;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    padding: 20px;
+}
+
+.skillsprint-modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+}
+
+.skillsprint-modal-close {
+    background: transparent;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 24px;
+    line-height: 1;
+}
+
+.skillsprint-modal-body {
+    padding: 20px;
+}
+
+/* Forms */
+.skillsprint-form {
+    margin-bottom: 20px;
+}
+
+.skillsprint-form-message {
+    border-radius: 4px;
+    margin-bottom: 15px;
+    padding: 10px;
+}
+
+.skillsprint-form-message.error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c2c7;
+    color: #842029;
+}
+
+.skillsprint-form-message.success {
+    background-color: #d1e7dd;
+    border: 1px solid #badbcc;
+    color: #0f5132;
+}
+
+.skillsprint-form-group {
+    margin-bottom: 15px;
+}
+
+.skillsprint-form-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 5px;
+}
+
+.skillsprint-form-input {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+    font-size: 14px;
+    padding: 10px;
+    width: 100%;
+}
+
+.skillsprint-form-input:focus {
+    border-color: var(--skillsprint-primary);
+    outline: none;
+}
+
+.skillsprint-form-checkbox {
+    align-items: center;
+    display: flex;
+    font-size: 14px;
+}
+
+.skillsprint-form-checkbox input {
+    margin-right: 8px;
+}
+
+.skillsprint-form-links {
+    font-size: 14px;
+    margin-top: 15px;
+    text-align: center;
+}
+
+.skillsprint-separator {
+    color: #ccc;
+    margin: 0 5px;
+}
+
+/* CSS Variables */
+:root {
+    --skillsprint-primary: #4f46e5;
+    --skillsprint-primary-dark: #4338ca;
+    --skillsprint-primary-light: #e0e7ff;
+    --skillsprint-primary-rgb: 79, 70, 229;
+    --skillsprint-secondary: #3b82f6;
+    --skillsprint-success: #10b981;
+    --skillsprint-warning: #f59e0b;
+    --skillsprint-danger: #ef4444;
+    --skillsprint-info: #3b82f6;
+}
