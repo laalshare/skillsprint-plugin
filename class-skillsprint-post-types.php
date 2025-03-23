@@ -72,7 +72,7 @@ class SkillSprint_Post_Types {
             'has_archive'           => true,
             'exclude_from_search'   => false,
             'publicly_queryable'    => true,
-            'capability_type'       => 'blueprint',
+            'capability_type'       => array('blueprint', 'blueprints'),
             'map_meta_cap'          => true,
             'show_in_rest'          => true,
             'rest_base'             => 'blueprints',

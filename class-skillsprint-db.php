@@ -198,23 +198,27 @@ class SkillSprint_DB {
      * @return   bool   Whether the blueprint is completed.
      */
     public static function check_blueprint_completion( $user_id, $blueprint_id ) {
-        $days_data = self::get_blueprint_days_data( $blueprint_id );
-        $total_days = count( $days_data );
+        global $wpdb;
         
-        if ( $total_days === 0 ) {
-            return false;
-        }
+        $table_name = $wpdb->prefix . 'skillsprint_progress';
         
-        $progress = self::get_user_blueprint_progress( $user_id, $blueprint_id );
-        $completed_days = 0;
+        // Query completed blueprints
+        $completed_blueprint_count = $wpdb->get_var( 
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM (
+                    SELECT blueprint_id, user_id, COUNT(*) as days_completed, 
+                    (SELECT COUNT(*) FROM {$table_name} as t2 WHERE t2.blueprint_id = t1.blueprint_id AND progress_status = 'completed' GROUP BY blueprint_id) as total_days
+                    FROM {$table_name} as t1 
+                    WHERE progress_status = 'completed' AND user_id = %d AND blueprint_id = %d
+                    GROUP BY blueprint_id, user_id
+                    HAVING days_completed = total_days
+                ) as completed_blueprints",
+                $user_id,
+                $blueprint_id
+            )
+        );
         
-        foreach ( $progress as $day_progress ) {
-            if ( $day_progress['progress_status'] === 'completed' ) {
-                $completed_days++;
-            }
-        }
-        
-        return $completed_days === $total_days;
+        return $completed_blueprint_count > 0;
     }
     
     /**
@@ -256,7 +260,18 @@ class SkillSprint_DB {
         $days_data = get_post_meta( $blueprint_id, '_skillsprint_days_data', true );
         
         if ( ! $days_data || ! is_array( $days_data ) ) {
+            // Initialize with empty default structure for 7 days
             $days_data = array();
+            for ( $i = 1; $i <= 7; $i++ ) {
+                $days_data[] = array(
+                    'day_number' => $i,
+                    'title' => sprintf( __( 'Day %d', 'skillsprint' ), $i ),
+                    'learning_objectives' => '',
+                    'content' => '',
+                    'resources' => array(),
+                    'quiz_id' => ''
+                );
+            }
         }
         
         return $days_data;
@@ -371,6 +386,15 @@ class SkillSprint_DB {
      * @param    int     $attempt      Attempt number.
      * @return   array   Score information.
      */
+    /**
+     * Get the latest quiz attempt number.
+     *
+     * @since    1.0.0
+     * @param    int     $user_id      The user ID.
+     * @param    int     $blueprint_id The blueprint ID.
+     * @param    string  $quiz_id      The quiz ID.
+     * @return   int     Latest attempt number.
+     */
     public static function calculate_quiz_score( $user_id, $blueprint_id, $quiz_id, $attempt = 1 ) {
         $responses = self::get_quiz_responses( $user_id, $blueprint_id, $quiz_id, $attempt );
         
@@ -414,31 +438,7 @@ class SkillSprint_DB {
         return $score_info['score_percentage'] >= $passing_score;
     }
     
-    /**
-     * Get the latest quiz attempt number.
-     *
-     * @since    1.0.0
-     * @param    int     $user_id      The user ID.
-     * @param    int     $blueprint_id The blueprint ID.
-     * @param    string  $quiz_id      The quiz ID.
-     * @return   int     Latest attempt number.
-     */
-    public static function get_latest_quiz_attempt( $user_id, $blueprint_id, $quiz_id ) {
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'skillsprint_quiz_responses';
-        
-        $result = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT MAX(attempt_number) FROM $table_name WHERE user_id = %d AND blueprint_id = %d AND quiz_id = %s",
-                $user_id,
-                $blueprint_id,
-                $quiz_id
-            )
-        );
-        
-        return intval( $result ) ? intval( $result ) : 0;
-    }
+    
     
     /**
      * Add user achievement.

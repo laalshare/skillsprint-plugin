@@ -114,12 +114,11 @@ class SkillSprint_Dashboard {
         // Recent activity
         $recent_activity = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT p.blueprint_id, p.day_number, p.progress_status, p.date_completed
-                FROM $progress_table as p
-                WHERE p.user_id = %d AND p.date_completed IS NOT NULL
+                "SELECT p.user_id, p.blueprint_id, p.day_number, p.progress_status, p.date_completed
+                FROM {$progress_table} as p
+                WHERE p.date_completed IS NOT NULL
                 ORDER BY p.date_completed DESC
-                LIMIT 5",
-                $user_id
+                LIMIT 5"
             )
         );
         

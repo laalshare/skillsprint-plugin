@@ -50,7 +50,7 @@ class SkillSprint_Activator {
         $user_points_table = $wpdb->prefix . 'skillsprint_user_points';
         $streaks_table = $wpdb->prefix . 'skillsprint_streaks';
         
-        // Progress Table
+        // Create tables
         $progress_sql = "CREATE TABLE $progress_table (
             id bigint(20) NOT NULL AUTO_INCREMENT,
             user_id bigint(20) NOT NULL,
