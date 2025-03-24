@@ -84,20 +84,28 @@ class SkillSprint_Access {
     }
     
     /**
-     * Add login/registration modals to footer.
-     *
-     * @since    1.0.0
-     */
-    public function add_login_registration_modals() {
-        // Only add on blueprint pages or when our shortcodes are present
-        if (is_singular('blueprint') || 
-            is_post_type_archive('blueprint') || 
-            is_tax('blueprint_category') || 
-            is_tax('blueprint_tag') || 
-            is_tax('blueprint_difficulty')) {
-            
-            include SKILLSPRINT_PLUGIN_DIR . 'public/partials/login-modal.php';
-            include SKILLSPRINT_PLUGIN_DIR . 'public/partials/register-modal.php';
+ * Add login/registration modals to footer.
+ *
+ * @since    1.0.0
+ */
+public function add_login_registration_modals() {
+    // Only add on blueprint pages or when our shortcodes are present
+    if (is_singular('blueprint') || 
+        is_post_type_archive('blueprint') || 
+        is_tax('blueprint_category') || 
+        is_tax('blueprint_tag') || 
+        is_tax('blueprint_difficulty')) {
+        
+        // Check if template files exist before including
+        $login_modal = SKILLSPRINT_PLUGIN_DIR . 'public/partials/login-modal.php';
+        $register_modal = SKILLSPRINT_PLUGIN_DIR . 'public/partials/register-modal.php';
+        
+        if (file_exists($login_modal)) {
+            include $login_modal;
+        }
+        
+        if (file_exists($register_modal)) {
+            include $register_modal;
         }
     }
-}
+}}

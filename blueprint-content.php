@@ -10,6 +10,30 @@
 if (!defined('ABSPATH')) {
     exit;
 }
+
+// Limit data retrieved to prevent memory issues
+$post_id = $post->ID ?? 0;
+$days_data = SkillSprint_DB::get_blueprint_days_data($post_id) ?? array();
+
+// Truncate days data if too large (more than 7 days)
+if (count($days_data) > 7) {
+    $days_data = array_slice($days_data, 0, 7);
+}
+
+$user_id = get_current_user_id();
+$user_progress = array();
+$days_free_access = 2; // Default value
+
+// Get settings
+$settings = get_option('skillsprint_settings');
+if ($settings && isset($settings['days_free_access'])) {
+    $days_free_access = intval($settings['days_free_access']);
+}
+
+// Get user progress if logged in - limit to current blueprint only
+if ($user_id) {
+    $user_progress = SkillSprint_DB::get_user_blueprint_progress($user_id, $post_id);
+}
 ?>
 
 <div class="skillsprint-blueprint" data-blueprint="<?php echo esc_attr($post->ID); ?>">

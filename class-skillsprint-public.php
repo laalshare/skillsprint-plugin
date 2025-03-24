@@ -47,97 +47,50 @@ class SkillSprint_Public {
     }
 
     /**
-     * Register the stylesheets for the public-facing side of the site.
-     *
-     * @since    1.0.0
-     */
-    public function enqueue_styles() {
-        // Use only on blueprint pages or when our shortcodes are present
-        if ( is_singular( 'blueprint' ) || 
-             is_post_type_archive( 'blueprint' ) || 
-             is_tax( 'blueprint_category' ) || 
-             is_tax( 'blueprint_tag' ) || 
-             is_tax( 'blueprint_difficulty' ) || 
-             $this->has_skillsprint_shortcode() ) {
-            
-            wp_enqueue_style( 'dashicons' );
-            wp_enqueue_style( 'select2', SKILLSPRINT_PLUGIN_URL . 'public/css/select2.min.css', array(), '4.1.0', 'all' );
-            wp_enqueue_style( $this->plugin_name, SKILLSPRINT_PLUGIN_URL . 'public/css/skillsprint-public.css', array(), $this->version, 'all' );
-            wp_enqueue_style( 'skillsprint-dashboard', SKILLSPRINT_PLUGIN_URL . 'public/css/skillsprint-dashboard.css', array(), $this->version, 'all' );
-        }
-    }
+ * Register the stylesheets for the public-facing side of the site.
+ *
+ * @since    1.0.0
+ */
+public function enqueue_styles() {
+    wp_enqueue_style('dashicons');
+    wp_enqueue_style($this->plugin_name, SKILLSPRINT_PLUGIN_URL . 'public/css/skillsprint-public.css', array(), $this->version, 'all');
+}
+
+/**
+ * Register the JavaScript for the public-facing side of the site.
+ *
+ * @since    1.0.0
+ */
+public function enqueue_scripts() {
+    wp_enqueue_script($this->plugin_name, SKILLSPRINT_PLUGIN_URL . 'public/js/skillsprint-public.js', array('jquery'), $this->version, true);
+    
+    // Pass basic data to script
+    wp_localize_script($this->plugin_name, 'skillsprint', array(
+        'ajax_url' => admin_url('admin-ajax.php'),
+        'nonce' => wp_create_nonce('skillsprint_nonce'),
+        'is_user_logged_in' => is_user_logged_in(),
+        'user_id' => get_current_user_id()
+    ));
+}
 
     /**
-     * Register the JavaScript for the public-facing side of the site.
-     *
-     * @since    1.0.0
-     */
-    public function enqueue_scripts() {
-        // Use only on blueprint pages or when our shortcodes are present
-        if ( is_singular( 'blueprint' ) || 
-             is_post_type_archive( 'blueprint' ) || 
-             is_tax( 'blueprint_category' ) || 
-             is_tax( 'blueprint_tag' ) || 
-             is_tax( 'blueprint_difficulty' ) || 
-             $this->has_skillsprint_shortcode() ) {
-            
-            wp_enqueue_script( 'chartjs', SKILLSPRINT_PLUGIN_URL . 'public/js/chart.min.js', array(), '3.7.0', true );
-            wp_enqueue_script( 'select2', SKILLSPRINT_PLUGIN_URL . 'public/js/select2.min.js', array( 'jquery' ), '4.1.0', true );
-            wp_enqueue_script( $this->plugin_name, SKILLSPRINT_PLUGIN_URL . 'public/js/skillsprint-public.js', array( 'jquery' ), $this->version, true );
-            wp_enqueue_script( 'blueprint-viewer', SKILLSPRINT_PLUGIN_URL . 'public/js/blueprint-viewer.js', array( 'jquery' ), $this->version, true );
-            wp_enqueue_script( 'quiz-interface', SKILLSPRINT_PLUGIN_URL . 'public/js/quiz-interface.js', array( 'jquery' ), $this->version, true );
-            
-            // Pass ajax url and user info to script
-            wp_localize_script( $this->plugin_name, 'skillsprint', array(
-                'ajax_url' => admin_url( 'admin-ajax.php' ),
-                'nonce' => wp_create_nonce( 'skillsprint_nonce' ),
-                'is_user_logged_in' => is_user_logged_in(),
-                'user_id' => get_current_user_id(),
-                'login_url' => wp_login_url( get_permalink() ),
-                'register_url' => wp_registration_url(),
-                'settings' => get_option( 'skillsprint_settings' ),
-                'i18n' => array(
-                    'login_required' => __( 'Login required', 'skillsprint' ),
-                    'login_message' => __( 'You need to log in to access this content.', 'skillsprint' ),
-                    'please_login' => __( 'Please log in to continue your learning journey.', 'skillsprint' ),
-                    'day_locked' => __( 'Day locked', 'skillsprint' ),
-                    'complete_previous' => __( 'You need to complete the previous days before accessing this one.', 'skillsprint' ),
-                    'quiz_submitted' => __( 'Quiz submitted successfully!', 'skillsprint' ),
-                    'quiz_error' => __( 'Error submitting quiz. Please try again.', 'skillsprint' ),
-                    'day_completed' => __( 'Day completed!', 'skillsprint' ),
-                    'congratulations' => __( 'Congratulations!', 'skillsprint' ),
-                    'blueprint_completed' => __( 'You have completed this blueprint!', 'skillsprint' ),
-                    'correct' => __( 'Correct', 'skillsprint' ),
-                    'incorrect' => __( 'Incorrect', 'skillsprint' ),
-                    'retry' => __( 'Retry', 'skillsprint' ),
-                    'continue' => __( 'Continue', 'skillsprint' ),
-                    'next_day' => __( 'Next Day', 'skillsprint' ),
-                    'previous_day' => __( 'Previous Day', 'skillsprint' ),
-                    'submit' => __( 'Submit', 'skillsprint' ),
-                    'saving' => __( 'Saving...', 'skillsprint' ),
-                    'loading' => __( 'Loading...', 'skillsprint' ),
-                )
-            ) );
-        }
-    }
-
-    /**
-     * Check if current page contains any of our shortcodes.
-     *
-     * @since    1.0.0
-     * @return   boolean   True if page has skillsprint shortcode.
-     */
-    private function has_skillsprint_shortcode() {
-        global $post;
-        
-        if ( is_a( $post, 'WP_Post' ) && has_shortcode( $post->post_content, 'skillsprint_dashboard' ) ||
-             has_shortcode( $post->post_content, 'skillsprint_blueprints' ) ||
-             has_shortcode( $post->post_content, 'skillsprint_leaderboard' ) ) {
-            return true;
-        }
-        
+ * Check if current page contains any of our shortcodes.
+ *
+ * @since    1.0.0
+ * @return   boolean   True if page has skillsprint shortcode.
+ */
+private function has_skillsprint_shortcode() {
+    global $post;
+    
+    // Safety check
+    if (!is_object($post) || !isset($post->post_content)) {
         return false;
     }
+    
+    return has_shortcode($post->post_content, 'skillsprint_dashboard') ||
+           has_shortcode($post->post_content, 'skillsprint_blueprints') ||
+           has_shortcode($post->post_content, 'skillsprint_leaderboard');
+}
 
     /**
      * Register shortcodes.
@@ -350,41 +303,38 @@ class SkillSprint_Public {
     }
 
     /**
-     * Filter blueprint content.
-     *
-     * @since    1.0.0
-     * @param    string $content The content.
-     * @return   string The filtered content.
-     */
-    public function filter_blueprint_content( $content ) {
-        global $post;
-        
-        if ( is_singular( 'blueprint' ) && $post->post_type === 'blueprint' ) {
-            // Increment view count
-            SkillSprint_Blueprint::increment_view_count( $post->ID );
-            
-            // Get settings
-            $settings = get_option( 'skillsprint_settings' );
-            $days_free_access = isset( $settings['days_free_access'] ) ? intval( $settings['days_free_access'] ) : 2;
-            
-            // Get days data
-            $days_data = SkillSprint_DB::get_blueprint_days_data( $post->ID );
-            
-            // Get user progress if logged in
-            $user_id = get_current_user_id();
-            $user_progress = array();
-            
-            if ( $user_id ) {
-                $user_progress = SkillSprint_DB::get_user_blueprint_progress( $user_id, $post->ID );
-            }
-            
-            ob_start();
-            include SKILLSPRINT_PLUGIN_DIR . 'public/partials/blueprint-content.php';
-            return ob_get_clean();
-        }
-        
+ * Filter blueprint content.
+ *
+ * @since    1.0.0
+ * @param    string $content The content.
+ * @return   string The filtered content.
+ */
+public function filter_blueprint_content($content) {
+    global $post;
+    
+    // Basic validation
+    if (!is_object($post) || !isset($post->post_type) || $post->post_type !== 'blueprint') {
         return $content;
     }
+    
+    // Only apply on single blueprint pages
+    if (!is_singular('blueprint')) {
+        return $content;
+    }
+    
+    // Return simple content format
+    return '<div class="skillsprint-blueprint">
+        <div class="skillsprint-blueprint-header">
+            <h1>' . get_the_title() . '</h1>
+            <div class="skillsprint-blueprint-meta">
+                <span>' . get_the_date() . '</span>
+            </div>
+        </div>
+        <div class="skillsprint-blueprint-content">
+            ' . $content . '
+        </div>
+    </div>';
+}
 
     /**
      * Custom blueprint single template.
@@ -393,21 +343,21 @@ class SkillSprint_Public {
      * @param    string $template The template.
      * @return   string The new template.
      */
-    public function blueprint_single_template( $template ) {
+    public function blueprint_single_template($template) {
         global $post;
         
-        if ( $post->post_type === 'blueprint' ) {
+        if (is_singular('blueprint')) {
             // Check if theme has a custom template
-            $theme_template = locate_template( array( 'single-blueprint.php' ) );
+            $theme_template = locate_template(array('single-blueprint.php'));
             
-            if ( $theme_template ) {
+            if ($theme_template) {
                 return $theme_template;
             }
             
             // Use plugin template
             $plugin_template = SKILLSPRINT_PLUGIN_DIR . 'public/templates/single-blueprint.php';
             
-            if ( file_exists( $plugin_template ) ) {
+            if (file_exists($plugin_template)) {
                 return $plugin_template;
             }
         }
@@ -422,19 +372,19 @@ class SkillSprint_Public {
      * @param    string $template The template.
      * @return   string The new template.
      */
-    public function blueprint_archive_template( $template ) {
-        if ( is_post_type_archive( 'blueprint' ) || is_tax( 'blueprint_category' ) || is_tax( 'blueprint_tag' ) || is_tax( 'blueprint_difficulty' ) ) {
+    public function blueprint_archive_template($template) {
+        if (is_post_type_archive('blueprint') || is_tax('blueprint_category') || is_tax('blueprint_tag') || is_tax('blueprint_difficulty')) {
             // Check if theme has a custom template
-            $theme_template = locate_template( array( 'archive-blueprint.php' ) );
+            $theme_template = locate_template(array('archive-blueprint.php'));
             
-            if ( $theme_template ) {
+            if ($theme_template) {
                 return $theme_template;
             }
             
             // Use plugin template
             $plugin_template = SKILLSPRINT_PLUGIN_DIR . 'public/templates/archive-blueprint.php';
             
-            if ( file_exists( $plugin_template ) ) {
+            if (file_exists($plugin_template)) {
                 return $plugin_template;
             }
         }

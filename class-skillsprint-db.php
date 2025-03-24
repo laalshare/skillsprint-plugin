@@ -24,21 +24,26 @@ class SkillSprint_DB {
      * @param    int    $blueprint_id The blueprint ID.
      * @return   array  User progress data.
      */
-    public static function get_user_blueprint_progress( $user_id, $blueprint_id ) {
+    public static function get_user_blueprint_progress($user_id, $blueprint_id) {
         global $wpdb;
         
         $table_name = $wpdb->prefix . 'skillsprint_progress';
         
+        // Limit to important fields only to reduce memory usage
         $results = $wpdb->get_results(
             $wpdb->prepare(
-                "SELECT * FROM $table_name WHERE user_id = %d AND blueprint_id = %d ORDER BY day_number ASC",
+                "SELECT user_id, blueprint_id, day_number, progress_status, date_completed 
+                 FROM {$table_name} 
+                 WHERE user_id = %d AND blueprint_id = %d 
+                 ORDER BY day_number ASC 
+                 LIMIT 10",  // Added a safety limit
                 $user_id,
                 $blueprint_id
             ),
             ARRAY_A
         );
         
-        return $results;
+        return $results ? $results : array();
     }
     
     /**
@@ -190,64 +195,82 @@ class SkillSprint_DB {
     }
     
     /**
-     * Check if a blueprint is completed by a user.
-     *
-     * @since    1.0.0
-     * @param    int    $user_id      The user ID.
-     * @param    int    $blueprint_id The blueprint ID.
-     * @return   bool   Whether the blueprint is completed.
-     */
-    public static function check_blueprint_completion( $user_id, $blueprint_id ) {
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'skillsprint_progress';
-        
-        // Query completed blueprints
-        $completed_blueprint_count = $wpdb->get_var( 
-            $wpdb->prepare(
-                "SELECT COUNT(*) FROM (
-                    SELECT blueprint_id, user_id, COUNT(*) as days_completed, 
-                    (SELECT COUNT(*) FROM {$table_name} as t2 WHERE t2.blueprint_id = t1.blueprint_id AND progress_status = 'completed' GROUP BY blueprint_id) as total_days
-                    FROM {$table_name} as t1 
-                    WHERE progress_status = 'completed' AND user_id = %d AND blueprint_id = %d
-                    GROUP BY blueprint_id, user_id
-                    HAVING days_completed = total_days
-                ) as completed_blueprints",
-                $user_id,
-                $blueprint_id
-            )
-        );
-        
-        return $completed_blueprint_count > 0;
+ * Check if a blueprint is completed by a user.
+ *
+ * @since    1.0.0
+ * @param    int    $user_id      The user ID.
+ * @param    int    $blueprint_id The blueprint ID.
+ * @return   bool   Whether the blueprint is completed.
+ */
+public static function check_blueprint_completion($user_id, $blueprint_id) {
+    // Add safety limit to avoid infinite loops
+    static $recursion_guard = [];
+    $guard_key = $user_id . '_' . $blueprint_id;
+    
+    if (isset($recursion_guard[$guard_key])) {
+        return false; // Break potential recursion
+    }
+    $recursion_guard[$guard_key] = true;
+    
+    $days_data = self::get_blueprint_days_data($blueprint_id);
+    $total_days = count($days_data);
+    
+    if ($total_days === 0) {
+        unset($recursion_guard[$guard_key]);
+        return false;
     }
     
-    /**
-     * Get blueprint completion percentage for a user.
-     *
-     * @since    1.0.0
-     * @param    int    $user_id      The user ID.
-     * @param    int    $blueprint_id The blueprint ID.
-     * @return   int    Completion percentage (0-100).
-     */
-    public static function get_blueprint_completion_percentage( $user_id, $blueprint_id ) {
-        $days_data = self::get_blueprint_days_data( $blueprint_id );
-        $total_days = count( $days_data );
-        
-        if ( $total_days === 0 ) {
-            return 0;
+    $progress = self::get_user_blueprint_progress($user_id, $blueprint_id);
+    $completed_days = 0;
+    
+    foreach ($progress as $day_progress) {
+        if ($day_progress['progress_status'] === 'completed') {
+            $completed_days++;
         }
-        
-        $progress = self::get_user_blueprint_progress( $user_id, $blueprint_id );
-        $completed_days = 0;
-        
-        foreach ( $progress as $day_progress ) {
-            if ( $day_progress['progress_status'] === 'completed' ) {
-                $completed_days++;
-            }
-        }
-        
-        return round( ( $completed_days / $total_days ) * 100 );
     }
+    
+    unset($recursion_guard[$guard_key]);
+    return $completed_days === $total_days;
+}
+    
+    /**
+ * Get blueprint completion percentage for a user.
+ *
+ * @since    1.0.0
+ * @param    int    $user_id      The user ID.
+ * @param    int    $blueprint_id The blueprint ID.
+ * @return   int    Completion percentage (0-100).
+ */
+public static function get_blueprint_completion_percentage($user_id, $blueprint_id) {
+    // Add safety limit to avoid infinite loops
+    static $recursion_guard = [];
+    $guard_key = $user_id . '_' . $blueprint_id;
+    
+    if (isset($recursion_guard[$guard_key])) {
+        return 0; // Break potential recursion
+    }
+    $recursion_guard[$guard_key] = true;
+    
+    $days_data = self::get_blueprint_days_data($blueprint_id);
+    $total_days = count($days_data);
+    
+    if ($total_days === 0) {
+        unset($recursion_guard[$guard_key]);
+        return 0;
+    }
+    
+    $progress = self::get_user_blueprint_progress($user_id, $blueprint_id);
+    $completed_days = 0;
+    
+    foreach ($progress as $day_progress) {
+        if ($day_progress['progress_status'] === 'completed') {
+            $completed_days++;
+        }
+    }
+    
+    unset($recursion_guard[$guard_key]);
+    return round(($completed_days / $total_days) * 100);
+}
     
     /**
      * Get blueprint days data.

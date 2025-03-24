@@ -67,68 +67,29 @@ class SkillSprint {
      * @access   private
      */
     private function load_dependencies() {
-        /**
-         * The class responsible for orchestrating the actions and filters of the
-         * core plugin.
-         */
+        // Load only essential classes in lite mode
         require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-loader.php';
-
-        /**
-         * The class responsible for defining internationalization functionality.
-         */
         require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-i18n.php';
-
-        /**
-         * The class responsible for defining all database operations.
-         */
-        require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-db.php';
-        
-        /**
-         * The class responsible for blueprint functionality.
-         */
-        require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-blueprint.php';
-        
-        /**
-         * Custom Post Types.
-         */
         require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-post-types.php';
         
-        /**
-         * Quiz System.
-         */
-        require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-quiz.php';
+        // Optional components based on lite mode
+        if (!defined('SKILLSPRINT_LITE_MODE') || !SKILLSPRINT_LITE_MODE) {
+            require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-db.php';
+            require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-blueprint.php';
+            require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-quiz.php';
+            require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-progress.php';
+            
+            if (!defined('SKILLSPRINT_DISABLE_GAMIFICATION') || !SKILLSPRINT_DISABLE_GAMIFICATION) {
+                require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-gamification.php';
+            }
+            
+            require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-access.php';
+            require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-dashboard.php';
+            require_once SKILLSPRINT_PLUGIN_DIR . 'admin/class-skillsprint-admin.php';
+        }
         
-        /**
-         * Progress Tracking.
-         */
-        require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-progress.php';
-        
-        /**
-         * Gamification.
-         */
-        require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-gamification.php';
-        
-        /**
-         * Access Control.
-         */
-        require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-access.php';
-        
-        /**
-         * User Dashboard.
-         */
-        require_once SKILLSPRINT_PLUGIN_DIR . 'includes/class-skillsprint-dashboard.php';
-
-        /**
-         * The class responsible for defining all actions that occur in the admin area.
-         */
-        require_once SKILLSPRINT_PLUGIN_DIR . 'admin/class-skillsprint-admin.php';
-
-        /**
-         * The class responsible for defining all actions that occur in the public-facing
-         * side of the site.
-         */
         require_once SKILLSPRINT_PLUGIN_DIR . 'public/class-skillsprint-public.php';
-
+    
         $this->loader = new SkillSprint_Loader();
     }
 
