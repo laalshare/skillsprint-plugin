@@ -23,47 +23,47 @@ class SkillSprint_Quiz {
      */
     public function ajax_submit_quiz() {
         // Check nonce
-        if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( $_POST['nonce'], 'skillsprint_nonce' ) ) {
-            wp_send_json_error( array( 'message' => __( 'Security check failed.', 'skillsprint' ) ) );
-        }
-        
-        // Check user login
-        if ( ! is_user_logged_in() ) {
-            wp_send_json_error( array( 'message' => __( 'You must be logged in to submit quizzes.', 'skillsprint' ) ) );
-        }
-        
-        // Get parameters
-        $user_id = get_current_user_id();
-        $blueprint_id = isset( $_POST['blueprint_id'] ) ? intval( $_POST['blueprint_id'] ) : 0;
-        $quiz_id = isset( $_POST['quiz_id'] ) ? sanitize_text_field( $_POST['quiz_id'] ) : '';
-        $answers = isset( $_POST['answers'] ) ? $_POST['answers'] : array();
-        
-        if ( ! $blueprint_id || empty( $quiz_id ) || empty( $answers ) ) {
-            wp_send_json_error( array( 'message' => __( 'Invalid quiz submission.', 'skillsprint' ) ) );
-        }
-        
-        // Get quiz data
-        $quiz_data = get_post_meta( $blueprint_id, '_skillsprint_quiz_' . $quiz_id, true );
-        
-        if ( ! $quiz_data || empty( $quiz_data['questions'] ) ) {
-            wp_send_json_error( array( 'message' => __( 'Quiz not found.', 'skillsprint' ) ) );
-        }
-        
-        // Check if user has reached max attempts
-        $max_attempts = isset( $quiz_data['max_attempts'] ) ? intval( $quiz_data['max_attempts'] ) : 3;
-        $settings = get_option( 'skillsprint_settings' );
-        $default_max_attempts = isset( $settings['max_quiz_attempts'] ) ? intval( $settings['max_quiz_attempts'] ) : 3;
-        
-        if ( $max_attempts <= 0 ) {
-            $max_attempts = $default_max_attempts;
-        }
-        
-        $current_attempt = SkillSprint_DB::get_latest_quiz_attempt( $user_id, $blueprint_id, $quiz_id );
-        $next_attempt = $current_attempt + 1;
-        
-        if ( $max_attempts > 0 && $current_attempt >= $max_attempts ) {
-            wp_send_json_error( array( 'message' => __( 'You have reached the maximum number of attempts for this quiz.', 'skillsprint' ) ) );
-        }
+    if (!isset($_POST['nonce']) || !wp_verify_nonce($_POST['nonce'], 'skillsprint_nonce')) {
+        wp_send_json_error(array('message' => __('Security check failed.', 'skillsprint')));
+    }
+    
+    // Check user login
+    if (!is_user_logged_in()) {
+        wp_send_json_error(array('message' => __('You must be logged in to submit quizzes.', 'skillsprint')));
+    }
+    
+    // Get parameters
+    $user_id = get_current_user_id();
+    $blueprint_id = isset($_POST['blueprint_id']) ? intval($_POST['blueprint_id']) : 0;
+    $quiz_id = isset($_POST['quiz_id']) ? sanitize_text_field($_POST['quiz_id']) : '';
+    $answers = isset($_POST['answers']) ? $_POST['answers'] : array();
+    
+    if (!$blueprint_id || empty($quiz_id) || empty($answers)) {
+        wp_send_json_error(array('message' => __('Invalid quiz submission.', 'skillsprint')));
+    }
+    
+    // Get quiz data
+    $quiz_data = get_post_meta($blueprint_id, '_skillsprint_quiz_' . $quiz_id, true);
+    
+    if (!$quiz_data || empty($quiz_data['questions'])) {
+        wp_send_json_error(array('message' => __('Quiz not found.', 'skillsprint')));
+    }
+    
+    // Check if user has reached max attempts
+    $max_attempts = isset($quiz_data['max_attempts']) ? intval($quiz_data['max_attempts']) : 3;
+    $settings = get_option('skillsprint_settings');
+    $default_max_attempts = isset($settings['max_quiz_attempts']) ? intval($settings['max_quiz_attempts']) : 3;
+    
+    if ($max_attempts <= 0) {
+        $max_attempts = $default_max_attempts;
+    }
+    
+    $current_attempt = SkillSprint_DB::get_latest_quiz_attempt($user_id, $blueprint_id, $quiz_id);
+    $next_attempt = $current_attempt + 1;
+    
+    if ($max_attempts > 0 && $current_attempt >= $max_attempts) {
+        wp_send_json_error(array('message' => __('You have reached the maximum number of attempts for this quiz.', 'skillsprint')));
+    }
         
         // Process quiz answers
         $total_points = 0;
@@ -163,9 +163,8 @@ class SkillSprint_Quiz {
         // Fire action for quiz completion
         do_action( 'skillsprint_quiz_completed', $user_id, $blueprint_id, $quiz_id, $passed );
         
-        // Return results
-        wp_send_json_success( array(
-            'message' => __( 'Quiz submitted successfully!', 'skillsprint' ),
+        wp_send_json_success(array(
+            'message' => __('Quiz submitted successfully!', 'skillsprint'),
             'score' => array(
                 'earned_points' => $earned_points,
                 'total_points' => $total_points,
@@ -178,7 +177,7 @@ class SkillSprint_Quiz {
                 'max_attempts' => $max_attempts
             ),
             'question_results' => $question_results
-        ) );
+        ));
     }
     
     /**

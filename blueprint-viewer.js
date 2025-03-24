@@ -34,8 +34,8 @@
         init() {
             this.initTabs();
             this.initDayNavigation();
+            this.initQuizHandling();
             this.initCompleteButtons();
-            this.loadUserProgress();
         }
         
         /**
@@ -124,31 +124,164 @@
                 
                 const $targetTab = self.$dayTabs.filter(`[data-day="${targetDay}"]`);
                 
-                if ($targetTab.length) {
+                if ($targetTab.length && !$targetTab.hasClass('locked')) {
                     $targetTab.trigger('click');
                 }
             });
+        }
+        
+        /**
+         * Initialize quiz handling
+         */
+        initQuizHandling() {
+            const self = this;
             
-            // Update navigation button states on tab change
-            this.$dayTabs.on('click', function() {
-                const dayNumber = $(this).data('day');
-                const $prevButton = self.$container.find('.skillsprint-day-nav-prev');
-                const $nextButton = self.$container.find('.skillsprint-day-nav-next');
+            // Quiz form submission
+            this.$container.find('.skillsprint-quiz-form').on('submit', function(e) {
+                e.preventDefault();
                 
-                // Disable prev button on first day
-                if (dayNumber === 1) {
-                    $prevButton.prop('disabled', true);
-                } else {
-                    $prevButton.prop('disabled', false);
+                const $form = $(this);
+                const $quiz = $form.closest('.skillsprint-quiz');
+                const quizId = $quiz.data('quiz');
+                const blueprintId = $quiz.data('blueprint');
+                const $submitButton = $form.find('button[type="submit"]');
+                const $message = $form.find('.skillsprint-quiz-message');
+                
+                // Validate form
+                let isValid = true;
+                $form.find('.skillsprint-question').each(function() {
+                    const $question = $(this);
+                    const questionType = $question.data('type');
+                    
+                    if (questionType === 'multiple_choice' || questionType === 'true_false') {
+                        if (!$question.find('input[type="radio"]:checked').length) {
+                            isValid = false;
+                            $question.addClass('error');
+                        } else {
+                            $question.removeClass('error');
+                        }
+                    } else if (questionType === 'multiple_answer') {
+                        // Multiple answer is optional
+                        $question.removeClass('error');
+                    } else if (questionType === 'matching') {
+                        const $selects = $question.find('select');
+                        let allFilled = true;
+                        
+                        $selects.each(function() {
+                            if (!$(this).val()) {
+                                allFilled = false;
+                            }
+                        });
+                        
+                        if (!allFilled) {
+                            isValid = false;
+                            $question.addClass('error');
+                        } else {
+                            $question.removeClass('error');
+                        }
+                    } else if (questionType === 'short_answer') {
+                        if (!$question.find('input[type="text"]').val().trim()) {
+                            isValid = false;
+                            $question.addClass('error');
+                        } else {
+                            $question.removeClass('error');
+                        }
+                    }
+                });
+                
+                if (!isValid) {
+                    $message.removeClass('success').addClass('error').html(skillsprint.i18n.quiz_validation_error);
+                    return;
                 }
                 
-                // Disable next button on last day or if next day is locked
-                const $nextTab = self.$dayTabs.filter(`[data-day="${dayNumber + 1}"]`);
-                if (!$nextTab.length || $nextTab.hasClass('locked')) {
-                    $nextButton.prop('disabled', true);
-                } else {
-                    $nextButton.prop('disabled', false);
-                }
+                // Disable button and show loading state
+                $submitButton.prop('disabled', true).text(skillsprint.i18n.submitting);
+                $message.removeClass('success error').empty();
+                
+                // Collect answers
+                const answers = {};
+                
+                $form.find('.skillsprint-question').each(function() {
+                    const $question = $(this);
+                    const questionId = $question.data('question');
+                    const questionType = $question.data('type');
+                    
+                    if (questionType === 'multiple_choice' || questionType === 'true_false') {
+                        answers[questionId] = $question.find('input[type="radio"]:checked').val();
+                    } else if (questionType === 'multiple_answer') {
+                        answers[questionId] = [];
+                        $question.find('input[type="checkbox"]:checked').each(function() {
+                            answers[questionId].push($(this).val());
+                        });
+                    } else if (questionType === 'matching') {
+                        answers[questionId] = {};
+                        $question.find('select').each(function() {
+                            const $select = $(this);
+                            answers[questionId][$select.data('left')] = $select.val();
+                        });
+                    } else if (questionType === 'short_answer') {
+                        answers[questionId] = $question.find('input[type="text"]').val();
+                    }
+                });
+                
+                // Send AJAX request
+                $.post(skillsprint.ajax_url, {
+                    action: 'skillsprint_submit_quiz',
+                    blueprint_id: blueprintId,
+                    quiz_id: quizId,
+                    answers: answers,
+                    nonce: skillsprint.nonce
+                }, function(response) {
+                    if (response.success) {
+                        // Show results
+                        self.displayQuizResults($quiz, response.data);
+                        
+                        // Enable complete day button if quiz passed
+                        if (response.data.score.passed) {
+                            $quiz.data('passed', true);
+                            self.$container.find('.skillsprint-complete-day-button').prop('disabled', false);
+                            self.$container.find('.skillsprint-quiz-required-message').hide();
+                        }
+                    } else {
+                        $message.addClass('error').html(response.data.message);
+                        $submitButton.prop('disabled', false).text(skillsprint.i18n.submit);
+                    }
+                }).fail(function() {
+                    $message.addClass('error').text('An error occurred. Please try again.');
+                    $submitButton.prop('disabled', false).text(skillsprint.i18n.submit);
+                });
+            });
+            
+            // Retry quiz button
+            this.$container.on('click', '.retry-quiz', function() {
+                const $button = $(this);
+                const $quiz = $button.closest('.skillsprint-quiz');
+                const $form = $quiz.find('.skillsprint-quiz-form');
+                const $results = $quiz.find('.skillsprint-quiz-results');
+                
+                // Reset form
+                $form[0].reset();
+                $form.find('.skillsprint-question').removeClass('correct incorrect error');
+                $form.find('.skillsprint-question-feedback').remove();
+                
+                // Show form and hide results
+                $form.show();
+                $results.hide();
+            });
+            
+            // Review quiz button
+            this.$container.on('click', '.review-quiz', function() {
+                const $button = $(this);
+                const $quiz = $button.closest('.skillsprint-quiz');
+                const $form = $quiz.find('.skillsprint-quiz-form');
+                const $results = $quiz.find('.skillsprint-quiz-results');
+                
+                // Hide results and show form
+                $results.hide();
+                $form.show();
+                
+                // Disable form inputs
+                $form.find('input, select, button[type="submit"]').prop('disabled', true);
             });
         }
         
@@ -158,11 +291,14 @@
         initCompleteButtons() {
             const self = this;
             
-            this.$container.find('.skillsprint-complete-day-button').on('click', function(e) {
-                e.preventDefault();
+            this.$container.find('.skillsprint-complete-day-button').on('click', function() {
+                if ($(this).prop('disabled')) {
+                    return;
+                }
                 
                 const $button = $(this);
                 const dayNumber = $button.data('day');
+                const blueprintId = $button.data('blueprint');
                 
                 // Check if user is logged in
                 if (!skillsprint.is_user_logged_in) {
@@ -170,64 +306,56 @@
                     return;
                 }
                 
-                // Check if there's a quiz that needs to be completed
-                const $dayContent = self.$container.find(`.skillsprint-day-content[data-day="${dayNumber}"]`);
-                const $quiz = $dayContent.find('.skillsprint-quiz');
-                
-                if ($quiz.length && !$quiz.data('passed')) {
-                    alert(skillsprint.i18n.quiz_needed);
-                    return;
-                }
-                
                 // Disable button and show loading state
                 $button.prop('disabled', true).text(skillsprint.i18n.saving);
                 
                 // Mark day as completed
-                self.markDayCompleted(dayNumber, $button);
-            });
-        }
-        
-        /**
-         * Load user progress
-         */
-        loadUserProgress() {
-            // Only load progress if user is logged in
-            if (!skillsprint.is_user_logged_in) {
-                return;
-            }
-            
-            const self = this;
-            
-            // Send AJAX request
-            $.post(skillsprint.ajax_url, {
-                action: 'skillsprint_get_user_blueprint_progress',
-                blueprint_id: this.blueprintId,
-                nonce: skillsprint.nonce
-            }, function(response) {
-                if (response.success) {
-                    // Update progress bar
-                    self.updateProgressBar(response.data.completion_percentage);
-                    
-                    // Update day tabs and buttons based on progress
-                    response.data.progress.forEach(function(dayProgress) {
-                        const dayNumber = dayProgress.day_number;
-                        const $tab = self.$dayTabs.filter(`[data-day="${dayNumber}"]`);
-                        const $button = self.$container.find(`.skillsprint-complete-day-button[data-day="${dayNumber}"]`);
+                $.post(skillsprint.ajax_url, {
+                    action: 'skillsprint_mark_day_completed',
+                    blueprint_id: blueprintId,
+                    day_number: dayNumber,
+                    nonce: skillsprint.nonce
+                }, function(response) {
+                    if (response.success) {
+                        // Update UI
+                        $button.text(skillsprint.i18n.day_completed).addClass('success');
                         
-                        if (dayProgress.progress_status === 'completed') {
-                            $tab.addClass('completed');
-                            $button.text(skillsprint.i18n.day_completed).addClass('success').prop('disabled', true);
-                            
-                            // Unlock next day if strict progression
-                            const $nextTab = self.$dayTabs.filter(`[data-day="${dayNumber + 1}"]`);
-                            if ($nextTab.length && $nextTab.hasClass('locked')) {
-                                $nextTab.removeClass('locked');
-                            }
-                        } else if (dayProgress.progress_status === 'in_progress') {
-                            // Nothing to do for in-progress days
+                        // Update tab status
+                        self.$dayTabs.filter(`[data-day="${dayNumber}"]`).addClass('completed');
+                        
+                        // Update progress bar
+                        if (response.data.completion_percentage !== undefined) {
+                            self.updateProgressBar(response.data.completion_percentage);
                         }
-                    });
-                }
+                        
+                        // Show completion message
+                        if (response.data.blueprint_completed) {
+                            self.showBlueprintCompletedMessage();
+                        } else if (response.data.next_day) {
+                            // Enable next day tab
+                            self.$dayTabs.filter(`[data-day="${response.data.next_day}"]`).removeClass('locked');
+                            
+                            // Show next day button
+                            const $nextButton = $('<button>', {
+                                class: 'skillsprint-button secondary skillsprint-next-day-button',
+                                text: skillsprint.i18n.next_day,
+                                'data-day': response.data.next_day
+                            });
+                            
+                            $button.after($nextButton);
+                            
+                            $nextButton.on('click', function() {
+                                self.$dayTabs.filter(`[data-day="${response.data.next_day}"]`).trigger('click');
+                            });
+                        }
+                    } else {
+                        alert(response.data.message);
+                        $button.prop('disabled', false).text(skillsprint.i18n.complete);
+                    }
+                }).fail(function() {
+                    alert('An error occurred. Please try again.');
+                    $button.prop('disabled', false).text(skillsprint.i18n.complete);
+                });
             });
         }
         
@@ -247,62 +375,6 @@
         }
         
         /**
-         * Mark a day as completed
-         * 
-         * @param {number} dayNumber Day number
-         * @param {jQuery} $button   Button element
-         */
-        markDayCompleted(dayNumber, $button) {
-            const self = this;
-            
-            // Send AJAX request
-            $.post(skillsprint.ajax_url, {
-                action: 'skillsprint_mark_day_completed',
-                blueprint_id: this.blueprintId,
-                day_number: dayNumber,
-                nonce: skillsprint.nonce
-            }, function(response) {
-                if (response.success) {
-                    // Update UI
-                    $button.text(skillsprint.i18n.day_completed).addClass('success');
-                    
-                    // Update tab status
-                    self.$dayTabs.filter(`[data-day="${dayNumber}"]`).addClass('completed');
-                    
-                    // Update progress bar
-                    self.updateProgressBar(response.data.completion_percentage);
-                    
-                    // Show completion message
-                    if (response.data.blueprint_completed) {
-                        self.showBlueprintCompletedMessage();
-                    } else if (response.data.next_day) {
-                        // Enable next day tab
-                        self.$dayTabs.filter(`[data-day="${response.data.next_day}"]`).removeClass('locked');
-                        
-                        // Show next day button
-                        const $nextButton = $('<button>', {
-                            class: 'skillsprint-button secondary skillsprint-next-day-button',
-                            text: skillsprint.i18n.next_day,
-                            'data-day': response.data.next_day
-                        });
-                        
-                        $button.after($nextButton);
-                        
-                        $nextButton.on('click', function() {
-                            self.$dayTabs.filter(`[data-day="${response.data.next_day}"]`).trigger('click');
-                        });
-                    }
-                } else {
-                    alert(response.data.message);
-                    $button.prop('disabled', false).text(skillsprint.i18n.complete);
-                }
-            }).fail(function() {
-                alert('An error occurred. Please try again.');
-                $button.prop('disabled', false).text(skillsprint.i18n.complete);
-            });
-        }
-        
-        /**
          * Update progress bar
          * 
          * @param {number} percentage Completion percentage
@@ -310,6 +382,62 @@
         updateProgressBar(percentage) {
             this.$progressBar.css('width', percentage + '%');
             this.$progressPercentage.text(percentage + '%');
+        }
+        
+        /**
+         * Display quiz results
+         * 
+         * @param {jQuery} $quiz Quiz container
+         * @param {object} data  Results data
+         */
+        displayQuizResults($quiz, data) {
+            const $form = $quiz.find('.skillsprint-quiz-form');
+            const $results = $quiz.find('.skillsprint-quiz-results');
+            
+            // Update results content
+            $results.find('.skillsprint-quiz-score-circle').text(data.score.percentage + '%');
+            $results.find('.skillsprint-quiz-score-value').text(
+                data.score.passed ? 
+                `${data.score.correct_count}/${data.score.total_questions} ${skillsprint.i18n.correct} (${skillsprint.i18n.passed})` : 
+                `${data.score.correct_count}/${data.score.total_questions} ${skillsprint.i18n.correct} (${skillsprint.i18n.failed})`
+            ).toggleClass('passed', data.score.passed).toggleClass('failed', !data.score.passed);
+            
+            // Update summary
+            const $summary = $results.find('.skillsprint-quiz-summary').empty();
+            
+            $summary.append(`<li><span>${skillsprint.i18n.points_earned}:</span> <span>${data.score.earned_points}/${data.score.total_points}</span></li>`);
+            $summary.append(`<li><span>${skillsprint.i18n.passing_score}:</span> <span>${data.score.passing_score}%</span></li>`);
+            $summary.append(`<li><span>${skillsprint.i18n.attempt}:</span> <span>${data.score.attempt}/${data.score.max_attempts === 0 ? '∞' : data.score.max_attempts}</span></li>`);
+            
+            // Show retry button if attempts remain and quiz was not passed
+            $results.find('.retry-quiz').toggle(!data.score.passed && data.score.attempt < data.score.max_attempts);
+            
+            // Mark questions as correct/incorrect
+            $form.find('.skillsprint-question').each(function() {
+                const $question = $(this);
+                const questionId = $question.data('question');
+                const result = data.question_results[questionId];
+                
+                if (result) {
+                    // Add correct/incorrect class
+                    $question.addClass(result.is_correct ? 'correct' : 'incorrect');
+                    
+                    // Add feedback
+                    let feedbackText = result.is_correct ? 
+                        skillsprint.i18n.correct : 
+                        skillsprint.i18n.incorrect;
+                    
+                    if (!result.is_correct && result.explanation) {
+                        feedbackText += `: ${result.explanation}`;
+                    }
+                    
+                    $question.append(`<div class="skillsprint-question-feedback ${result.is_correct ? 'correct' : 'incorrect'}">${feedbackText}</div>`);
+                }
+            });
+            
+            // Hide form and show results
+            $form.hide();
+            $results.show();
         }
         
         /**
@@ -329,8 +457,8 @@
                             <p>${skillsprint.i18n.please_login}</p>
                         </div>
                         <div class="skillsprint-modal-footer">
-                            <button class="skillsprint-button login-button">Log In</button>
-                            <button class="skillsprint-button secondary register-button">Register</button>
+                            <button class="skillsprint-button login-button">${skillsprint.i18n.login}</button>
+                            <button class="skillsprint-button secondary register-button">${skillsprint.i18n.register}</button>
                         </div>
                     </div>
                 </div>
@@ -378,7 +506,7 @@
                             <p>${skillsprint.i18n.complete_previous}</p>
                         </div>
                         <div class="skillsprint-modal-footer">
-                            <button class="skillsprint-button skillsprint-modal-close">OK</button>
+                            <button class="skillsprint-button skillsprint-modal-close">${skillsprint.i18n.ok}</button>
                         </div>
                     </div>
                 </div>
@@ -413,13 +541,13 @@
                         <div class="skillsprint-modal-body">
                             <div class="skillsprint-alert success">
                                 <h4 class="skillsprint-alert-title">${skillsprint.i18n.blueprint_completed}</h4>
-                                <p class="skillsprint-alert-message">You have successfully completed all 7 days of this blueprint. Great job!</p>
+                                <p class="skillsprint-alert-message">${skillsprint.i18n.blueprint_completed_message}</p>
                             </div>
-                            <p>You've reached a significant milestone in your learning journey. Your progress has been saved, and you'll receive points and achievements for your accomplishment.</p>
+                            <p>${skillsprint.i18n.blueprint_completed_description}</p>
                         </div>
                         <div class="skillsprint-modal-footer">
-                            <a href="/skillsprint-dashboard" class="skillsprint-button">View Dashboard</a>
-                            <button class="skillsprint-button secondary skillsprint-modal-close">Close</button>
+                            <a href="${skillsprint.dashboard_url}" class="skillsprint-button">${skillsprint.i18n.view_dashboard}</a>
+                            <button class="skillsprint-button secondary skillsprint-modal-close">${skillsprint.i18n.close}</button>
                         </div>
                     </div>
                 </div>
@@ -440,11 +568,155 @@
         }
     }
     
-    // Initialize blueprint viewer when document is ready
+    /**
+     * Modal handling
+     */
+    function initModals() {
+        // Login/register button handlers
+        $('.skillsprint-login-button').on('click', function(e) {
+            e.preventDefault();
+            showLoginModal();
+        });
+        
+        $('.skillsprint-register-button').on('click', function(e) {
+            e.preventDefault();
+            showRegisterModal();
+        });
+        
+        // Close modal when clicking overlay or close button
+        $('.skillsprint-modal-overlay').on('click', function(e) {
+            if ($(e.target).hasClass('skillsprint-modal-overlay')) {
+                closeAllModals();
+            }
+        });
+        
+        $('.skillsprint-modal-close').on('click', function() {
+            closeAllModals();
+        });
+        
+        // Login form submission
+        $('#skillsprint-login-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const $form = $(this);
+            const $submitButton = $form.find('button[type="submit"]');
+            const $message = $form.find('.skillsprint-form-message');
+            
+            // Disable button and show loading state
+            $submitButton.prop('disabled', true).text(skillsprint.i18n.loading);
+            $message.removeClass('success error').empty();
+            
+            // Get form data
+            const formData = {
+                username: $form.find('input[name="username"]').val(),
+                password: $form.find('input[name="password"]').val(),
+                remember: $form.find('input[name="remember"]').is(':checked'),
+                redirect_url: window.location.href,
+                nonce: skillsprint.nonce,
+                action: 'skillsprint_login_user'
+            };
+            
+            // Send AJAX request
+            $.post(skillsprint.ajax_url, formData, function(response) {
+                if (response.success) {
+                    $message.addClass('success').text(response.data.message);
+                    
+                    // Redirect after successful login
+                    setTimeout(function() {
+                        window.location.href = response.data.redirect_url;
+                    }, 1000);
+                } else {
+                    $message.addClass('error').text(response.data.message);
+                    $submitButton.prop('disabled', false).text(skillsprint.i18n.submit);
+                }
+            }).fail(function() {
+                $message.addClass('error').text('An error occurred. Please try again.');
+                $submitButton.prop('disabled', false).text(skillsprint.i18n.submit);
+            });
+        });
+        
+        // Registration form submission
+        $('#skillsprint-register-form').on('submit', function(e) {
+            e.preventDefault();
+            
+            const $form = $(this);
+            const $submitButton = $form.find('button[type="submit"]');
+            const $message = $form.find('.skillsprint-form-message');
+            
+            // Disable button and show loading state
+            $submitButton.prop('disabled', true).text(skillsprint.i18n.loading);
+            $message.removeClass('success error').empty();
+            
+            // Validate password
+            const password = $form.find('input[name="password"]').val();
+            const passwordConfirm = $form.find('input[name="password_confirm"]').val();
+            
+            if (password !== passwordConfirm) {
+                $message.addClass('error').text(skillsprint.i18n.passwords_dont_match);
+                $submitButton.prop('disabled', false).text(skillsprint.i18n.submit);
+                return;
+            }
+            
+            // Get form data
+            const formData = {
+                username: $form.find('input[name="username"]').val(),
+                email: $form.find('input[name="email"]').val(),
+                password: password,
+                redirect_url: window.location.href,
+                nonce: skillsprint.nonce,
+                action: 'skillsprint_register_user'
+            };
+            
+            // Send AJAX request
+            $.post(skillsprint.ajax_url, formData, function(response) {
+                if (response.success) {
+                    $message.addClass('success').text(response.data.message);
+                    
+                    // Redirect after successful registration
+                    setTimeout(function() {
+                        window.location.href = response.data.redirect_url;
+                    }, 1000);
+                } else {
+                    $message.addClass('error').text(response.data.message);
+                    $submitButton.prop('disabled', false).text(skillsprint.i18n.submit);
+                }
+            }).fail(function() {
+                $message.addClass('error').text('An error occurred. Please try again.');
+                $submitButton.prop('disabled', false).text(skillsprint.i18n.submit);
+            });
+        });
+    }
+
+    /**
+     * Show login modal
+     */
+    function showLoginModal() {
+        closeAllModals();
+        $('#skillsprint-login-modal').addClass('active');
+    }
+
+    /**
+     * Show register modal
+     */
+    function showRegisterModal() {
+        closeAllModals();
+        $('#skillsprint-register-modal').addClass('active');
+    }
+
+    /**
+     * Close all modals
+     */
+    function closeAllModals() {
+        $('.skillsprint-modal-overlay').removeClass('active');
+    }
+    
+    // Initialize when document is ready
     $(document).ready(function() {
         $('.skillsprint-blueprint').each(function() {
             new BlueprintViewer($(this));
         });
+        
+        initModals();
     });
 
 })(jQuery);

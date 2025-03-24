@@ -17,52 +17,52 @@
 class SkillSprint_Gamification {
 
     /**
-     * Award points for completing a day.
-     *
-     * @since    1.0.0
-     * @param    int    $user_id      The user ID.
-     * @param    int    $blueprint_id The blueprint ID.
-     * @param    int    $day_number   The day number.
-     */
-    public function award_day_completion_points( $user_id, $blueprint_id, $day_number ) {
-        // Get settings
-        $settings = get_option( 'skillsprint_settings' );
-        
-        // Check if gamification is enabled
-        if ( ! isset( $settings['gamification_enabled'] ) || ! $settings['gamification_enabled'] ) {
-            return;
-        }
-        
-        $points_per_day = isset( $settings['points_per_day_completion'] ) ? intval( $settings['points_per_day_completion'] ) : 10;
-        
-        if ( $points_per_day <= 0 ) {
-            return;
-        }
-        
-        // Get streak info for potential bonus
-        $streak_info = SkillSprint_DB::get_user_streak( $user_id );
-        $streak_bonus_multiplier = isset( $settings['streak_bonus_multiplier'] ) ? floatval( $settings['streak_bonus_multiplier'] ) : 1.5;
-        $current_streak = isset( $streak_info['current_streak'] ) ? intval( $streak_info['current_streak'] ) : 0;
-        
-        // Calculate points
-        $points = $points_per_day;
-        $description = sprintf( __( 'Completed Day %d of blueprint: %s', 'skillsprint' ), $day_number, get_the_title( $blueprint_id ) );
-        
-        // Add streak bonus if streak is active
-        if ( $current_streak >= 3 && $streak_bonus_multiplier > 1 ) {
-            $points = round( $points * $streak_bonus_multiplier );
-            $description .= sprintf( __( ' (includes %dx streak bonus)', 'skillsprint' ), $streak_bonus_multiplier );
-        }
-        
-        // Award points
-        SkillSprint_DB::add_user_points(
-            $user_id,
-            $points,
-            'day_completion',
-            $description,
-            $blueprint_id
-        );
+ * Award points for completing a day.
+ *
+ * @since    1.0.0
+ * @param    int    $user_id      The user ID.
+ * @param    int    $blueprint_id The blueprint ID.
+ * @param    int    $day_number   The day number.
+ */
+public function award_day_completion_points($user_id, $blueprint_id, $day_number) {
+    // Get settings
+    $settings = get_option('skillsprint_settings');
+    
+    // Check if gamification is enabled
+    if (!isset($settings['gamification_enabled']) || !$settings['gamification_enabled']) {
+        return;
     }
+    
+    $points_per_day = isset($settings['points_per_day_completion']) ? intval($settings['points_per_day_completion']) : 10;
+    
+    if ($points_per_day <= 0) {
+        return;
+    }
+    
+    // Get streak info for potential bonus
+    $streak_info = SkillSprint_DB::get_user_streak($user_id);
+    $streak_bonus_multiplier = isset($settings['streak_bonus_multiplier']) ? floatval($settings['streak_bonus_multiplier']) : 1.5;
+    $current_streak = isset($streak_info['current_streak']) ? intval($streak_info['current_streak']) : 0;
+    
+    // Calculate points
+    $points = $points_per_day;
+    $description = sprintf(__('Completed Day %d of blueprint: %s', 'skillsprint'), $day_number, get_the_title($blueprint_id));
+    
+    // Add streak bonus if streak is active
+    if ($current_streak >= 3 && $streak_bonus_multiplier > 1) {
+        $points = round($points * $streak_bonus_multiplier);
+        $description .= sprintf(__(' (includes %dx streak bonus)', 'skillsprint'), $streak_bonus_multiplier);
+    }
+    
+    // Award points
+    SkillSprint_DB::add_user_points(
+        $user_id,
+        $points,
+        'day_completion',
+        $description,
+        $blueprint_id
+    );
+}
     
     /**
      * Award points for completing a quiz.

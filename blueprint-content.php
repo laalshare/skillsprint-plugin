@@ -10,30 +10,6 @@
 if (!defined('ABSPATH')) {
     exit;
 }
-
-// Limit data retrieved to prevent memory issues
-$post_id = $post->ID ?? 0;
-$days_data = SkillSprint_DB::get_blueprint_days_data($post_id) ?? array();
-
-// Truncate days data if too large (more than 7 days)
-if (count($days_data) > 7) {
-    $days_data = array_slice($days_data, 0, 7);
-}
-
-$user_id = get_current_user_id();
-$user_progress = array();
-$days_free_access = 2; // Default value
-
-// Get settings
-$settings = get_option('skillsprint_settings');
-if ($settings && isset($settings['days_free_access'])) {
-    $days_free_access = intval($settings['days_free_access']);
-}
-
-// Get user progress if logged in - limit to current blueprint only
-if ($user_id) {
-    $user_progress = SkillSprint_DB::get_user_blueprint_progress($user_id, $post_id);
-}
 ?>
 
 <div class="skillsprint-blueprint" data-blueprint="<?php echo esc_attr($post->ID); ?>">
@@ -178,21 +154,21 @@ if ($user_id) {
                         
                         <?php if (!empty($learning_objectives)) : ?>
                             <div class="skillsprint-learning-objectives">
-                                <h3 class="skillsprint-learning-objectives-title">Learning Objectives</h3>
+                                <h3 class="skillsprint-learning-objectives-title"><?php esc_html_e('Learning Objectives', 'skillsprint'); ?></h3>
                                 <div class="skillsprint-learning-objectives-content">
-                                    <?php echo wp_kses_post($learning_objectives); ?>
+                                    <?php echo wp_kses_post(nl2br($learning_objectives)); ?>
                                 </div>
                             </div>
                         <?php endif; ?>
                     </div>
                     
                     <div class="skillsprint-day-body">
-                        <?php echo wp_kses_post($day_content); ?>
+                        <?php echo apply_filters('the_content', $day_content); ?>
                     </div>
                     
                     <?php if (!empty($resources)) : ?>
                         <div class="skillsprint-day-resources">
-                            <h3 class="skillsprint-day-resources-title">Resources</h3>
+                            <h3 class="skillsprint-day-resources-title"><?php esc_html_e('Resources', 'skillsprint'); ?></h3>
                             <ul class="skillsprint-resource-list">
                                 <?php foreach ($resources as $resource) : ?>
                                     <li class="skillsprint-resource-item">
@@ -215,8 +191,20 @@ if ($user_id) {
                             $quiz_description = isset($quiz_data['description']) ? $quiz_data['description'] : '';
                             $passing_score = isset($quiz_data['passing_score']) ? intval($quiz_data['passing_score']) : 70;
                             $max_attempts = isset($quiz_data['max_attempts']) ? intval($quiz_data['max_attempts']) : 3;
+                            
+                            // Get quiz status if user is logged in
+                            $quiz_passed = false;
+                            $quiz_attempts = 0;
+                            $quiz_score = 0;
+                            
+                            if (is_user_logged_in()) {
+                                $day_progress = isset($user_progress[$day_number]) ? $user_progress[$day_number] : array();
+                                $quiz_passed = isset($day_progress['quiz_status']) && $day_progress['quiz_status'] === 'passed';
+                                $quiz_attempts = isset($day_progress['quiz_attempts']) ? intval($day_progress['quiz_attempts']) : 0;
+                                $quiz_score = isset($day_progress['quiz_score']) ? intval($day_progress['quiz_score']) : 0;
+                            }
                             ?>
-                            <div class="skillsprint-quiz" data-quiz="<?php echo esc_attr($quiz_id); ?>" data-blueprint="<?php echo esc_attr($post->ID); ?>">
+                            <div class="skillsprint-quiz" data-quiz="<?php echo esc_attr($quiz_id); ?>" data-blueprint="<?php echo esc_attr($post->ID); ?>" data-passed="<?php echo $quiz_passed ? 'true' : 'false'; ?>">
                                 <div class="skillsprint-quiz-header">
                                     <h3 class="skillsprint-quiz-title"><?php echo esc_html($quiz_title); ?></h3>
                                     <?php if (!empty($quiz_description)) : ?>
@@ -225,102 +213,159 @@ if ($user_id) {
                                     <div class="skillsprint-quiz-meta">
                                         <div class="skillsprint-quiz-meta-item">
                                             <i class="dashicons dashicons-chart-bar"></i>
-                                            Passing Score: <?php echo esc_html($passing_score); ?>%
+                                            <?php printf(esc_html__('Passing Score: %d%%', 'skillsprint'), $passing_score); ?>
                                         </div>
                                         <div class="skillsprint-quiz-meta-item">
                                             <i class="dashicons dashicons-update"></i>
-                                            Maximum Attempts: <?php echo esc_html($max_attempts); ?>
+                                            <?php printf(esc_html__('Maximum Attempts: %d', 'skillsprint'), $max_attempts); ?>
                                         </div>
+                                        <?php if (is_user_logged_in() && $quiz_attempts > 0) : ?>
+                                            <div class="skillsprint-quiz-meta-item">
+                                                <i class="dashicons dashicons-performance"></i>
+                                                <?php printf(esc_html__('Your Attempts: %d', 'skillsprint'), $quiz_attempts); ?>
+                                            </div>
+                                            <?php if ($quiz_passed) : ?>
+                                                <div class="skillsprint-quiz-meta-item">
+                                                    <i class="dashicons dashicons-yes"></i>
+                                                    <?php printf(esc_html__('Score: %d%% (Passed)', 'skillsprint'), $quiz_score); ?>
+                                                </div>
+                                            <?php elseif ($quiz_score > 0) : ?>
+                                                <div class="skillsprint-quiz-meta-item">
+                                                    <i class="dashicons dashicons-no"></i>
+                                                    <?php printf(esc_html__('Score: %d%% (Failed)', 'skillsprint'), $quiz_score); ?>
+                                                </div>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                                 
-                                <form class="skillsprint-quiz-form">
-                                    <div class="skillsprint-quiz-message"></div>
-                                    
-                                    <?php foreach ($quiz_data['questions'] as $question) : ?>
-                                        <div class="skillsprint-question" data-question="<?php echo esc_attr($question['id']); ?>" data-type="<?php echo esc_attr($question['type']); ?>">
-                                            <h4 class="skillsprint-question-text"><?php echo wp_kses_post($question['text']); ?></h4>
-                                            
-                                            <?php if ($question['type'] === 'multiple_choice') : ?>
-                                                <ul class="skillsprint-question-options">
-                                                    <?php foreach ($question['options'] as $option_key => $option_text) : ?>
-                                                        <li class="skillsprint-question-option">
-                                                            <label>
-                                                                <input type="radio" name="question_<?php echo esc_attr($question['id']); ?>" value="<?php echo esc_attr($option_key); ?>">
-                                                                <?php echo wp_kses_post($option_text); ?>
-                                                            </label>
-                                                        </li>
-                                                    <?php endforeach; ?>
-                                                </ul>
-                                                
-                                            <?php elseif ($question['type'] === 'true_false') : ?>
-                                                <ul class="skillsprint-question-options">
-                                                    <li class="skillsprint-question-option">
-                                                        <label>
-                                                            <input type="radio" name="question_<?php echo esc_attr($question['id']); ?>" value="true">
-                                                            True
-                                                        </label>
-                                                    </li>
-                                                    <li class="skillsprint-question-option">
-                                                        <label>
-                                                            <input type="radio" name="question_<?php echo esc_attr($question['id']); ?>" value="false">
-                                                            False
-                                                        </label>
-                                                    </li>
-                                                </ul>
-                                                
-                                            <?php elseif ($question['type'] === 'multiple_answer') : ?>
-                                                <ul class="skillsprint-question-options">
-                                                    <?php foreach ($question['options'] as $option_key => $option_text) : ?>
-                                                        <li class="skillsprint-question-option">
-                                                            <label>
-                                                                <input type="checkbox" name="question_<?php echo esc_attr($question['id']); ?>[]" value="<?php echo esc_attr($option_key); ?>">
-                                                                <?php echo wp_kses_post($option_text); ?>
-                                                            </label>
-                                                        </li>
-                                                    <?php endforeach; ?>
-                                                </ul>
-                                                
-                                            <?php elseif ($question['type'] === 'matching') : ?>
-                                                <div class="skillsprint-question-options matching">
-                                                    <?php foreach ($question['options'] as $option) : ?>
-                                                        <div class="skillsprint-question-option">
-                                                            <span class="matching-left"><?php echo wp_kses_post($option['left']); ?></span>
-                                                            <select name="question_<?php echo esc_attr($question['id']); ?>[<?php echo esc_attr($option['left']); ?>]" data-left="<?php echo esc_attr($option['left']); ?>">
-                                                                <option value="">Select a match</option>
-                                                                <?php
-                                                                // Get all right options
-                                                                $right_options = array_map(function($opt) {
-                                                                    return $opt['right'];
-                                                                }, $question['options']);
-                                                                
-                                                                foreach ($right_options as $right_option) :
-                                                                    ?>
-                                                                    <option value="<?php echo esc_attr($right_option); ?>"><?php echo wp_kses_post($right_option); ?></option>
-                                                                    <?php
-                                                                endforeach;
-                                                                ?>
-                                                            </select>
-                                                        </div>
-                                                    <?php endforeach; ?>
-                                                </div>
-                                                
-                                            <?php elseif ($question['type'] === 'short_answer') : ?>
-                                                <div class="skillsprint-question-option">
-                                                    <input type="text" name="question_<?php echo esc_attr($question['id']); ?>" placeholder="Your answer">
-                                                </div>
-                                            <?php endif; ?>
-                                            
-                                            <?php if (isset($question['points']) && $question['points'] > 1) : ?>
-                                                <div class="skillsprint-question-points">Points: <?php echo esc_html($question['points']); ?></div>
-                                            <?php endif; ?>
+                                <?php if ($quiz_passed) : ?>
+                                    <div class="skillsprint-quiz-passed-message">
+                                        <div class="skillsprint-alert success">
+                                            <i class="dashicons dashicons-yes-alt"></i>
+                                            <p><?php esc_html_e('You have successfully passed this quiz!', 'skillsprint'); ?></p>
                                         </div>
-                                    <?php endforeach; ?>
-                                    
-                                    <div class="skillsprint-quiz-footer">
-                                        <button type="submit" class="skillsprint-button">Submit Quiz</button>
                                     </div>
-                                </form>
+                                <?php elseif (is_user_logged_in() && $max_attempts > 0 && $quiz_attempts >= $max_attempts) : ?>
+                                    <div class="skillsprint-quiz-max-attempts-message">
+                                        <div class="skillsprint-alert warning">
+                                            <i class="dashicons dashicons-warning"></i>
+                                            <p><?php esc_html_e('You have reached the maximum number of attempts for this quiz.', 'skillsprint'); ?></p>
+                                        </div>
+                                    </div>
+                                <?php elseif (is_user_logged_in()) : ?>
+                                    <form class="skillsprint-quiz-form" data-quiz="<?php echo esc_attr($quiz_id); ?>" data-blueprint="<?php echo esc_attr($post->ID); ?>">
+                                        <div class="skillsprint-quiz-message"></div>
+                                        
+                                        <?php foreach ($quiz_data['questions'] as $question) : ?>
+                                            <div class="skillsprint-question" data-question="<?php echo esc_attr($question['id']); ?>" data-type="<?php echo esc_attr($question['type']); ?>">
+                                                <h4 class="skillsprint-question-text"><?php echo wp_kses_post($question['text']); ?></h4>
+                                                
+                                                <?php if ($question['type'] === 'multiple_choice') : ?>
+                                                    <ul class="skillsprint-question-options">
+                                                        <?php foreach ($question['options'] as $option_key => $option_text) : ?>
+                                                            <li class="skillsprint-question-option">
+                                                                <label>
+                                                                    <input type="radio" name="question_<?php echo esc_attr($question['id']); ?>" value="<?php echo esc_attr($option_key); ?>">
+                                                                    <?php echo wp_kses_post($option_text); ?>
+                                                                </label>
+                                                            </li>
+                                                        <?php endforeach; ?>
+                                                    </ul>
+                                                    
+                                                <?php elseif ($question['type'] === 'true_false') : ?>
+                                                    <ul class="skillsprint-question-options">
+                                                        <li class="skillsprint-question-option">
+                                                            <label>
+                                                                <input type="radio" name="question_<?php echo esc_attr($question['id']); ?>" value="true">
+                                                                <?php esc_html_e('True', 'skillsprint'); ?>
+                                                            </label>
+                                                        </li>
+                                                        <li class="skillsprint-question-option">
+                                                            <label>
+                                                                <input type="radio" name="question_<?php echo esc_attr($question['id']); ?>" value="false">
+                                                                <?php esc_html_e('False', 'skillsprint'); ?>
+                                                            </label>
+                                                        </li>
+                                                    </ul>
+                                                    
+                                                <?php elseif ($question['type'] === 'multiple_answer') : ?>
+                                                    <ul class="skillsprint-question-options">
+                                                        <?php foreach ($question['options'] as $option_key => $option_text) : ?>
+                                                            <li class="skillsprint-question-option">
+                                                                <label>
+                                                                    <input type="checkbox" name="question_<?php echo esc_attr($question['id']); ?>[]" value="<?php echo esc_attr($option_key); ?>">
+                                                                    <?php echo wp_kses_post($option_text); ?>
+                                                                </label>
+                                                            </li>
+                                                        <?php endforeach; ?>
+                                                    </ul>
+                                                    
+                                                <?php elseif ($question['type'] === 'matching') : ?>
+                                                    <div class="skillsprint-question-options matching">
+                                                        <?php foreach ($question['options'] as $option) : ?>
+                                                            <div class="skillsprint-question-option">
+                                                                <span class="matching-left"><?php echo wp_kses_post($option['left']); ?></span>
+                                                                <select name="question_<?php echo esc_attr($question['id']); ?>[<?php echo esc_attr($option['left']); ?>]" data-left="<?php echo esc_attr($option['left']); ?>">
+                                                                    <option value=""><?php esc_html_e('Select a match', 'skillsprint'); ?></option>
+                                                                    <?php
+                                                                    // Get all right options
+                                                                    $right_options = array_map(function($opt) {
+                                                                        return $opt['right'];
+                                                                    }, $question['options']);
+                                                                    
+                                                                    foreach ($right_options as $right_option) :
+                                                                        ?>
+                                                                        <option value="<?php echo esc_attr($right_option); ?>"><?php echo wp_kses_post($right_option); ?></option>
+                                                                        <?php
+                                                                    endforeach;
+                                                                    ?>
+                                                                </select>
+                                                            </div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                    
+                                                <?php elseif ($question['type'] === 'short_answer') : ?>
+                                                    <div class="skillsprint-question-option">
+                                                        <input type="text" name="question_<?php echo esc_attr($question['id']); ?>" placeholder="<?php esc_attr_e('Your answer', 'skillsprint'); ?>">
+                                                    </div>
+                                                <?php endif; ?>
+                                                
+                                                <?php if (isset($question['points']) && $question['points'] > 1) : ?>
+                                                    <div class="skillsprint-question-points"><?php printf(esc_html__('Points: %d', 'skillsprint'), $question['points']); ?></div>
+                                                <?php endif; ?>
+                                            </div>
+                                        <?php endforeach; ?>
+                                        
+                                        <div class="skillsprint-quiz-footer">
+                                            <button type="submit" class="skillsprint-button"><?php esc_html_e('Submit Quiz', 'skillsprint'); ?></button>
+                                        </div>
+                                    </form>
+                                <?php else : ?>
+                                    <div class="skillsprint-quiz-login-required">
+                                        <div class="skillsprint-alert warning">
+                                            <i class="dashicons dashicons-lock"></i>
+                                            <p><?php esc_html_e('Please log in to take this quiz and track your progress.', 'skillsprint'); ?></p>
+                                            <button type="button" class="skillsprint-button skillsprint-login-button"><?php esc_html_e('Log In', 'skillsprint'); ?></button>
+                                        </div>
+                                    </div>
+                                <?php endif; ?>
+                                
+                                <div class="skillsprint-quiz-results" style="display:none;">
+                                    <h3 class="skillsprint-quiz-results-title"><?php esc_html_e('Quiz Results', 'skillsprint'); ?></h3>
+                                    <div class="skillsprint-quiz-score">
+                                        <div class="skillsprint-quiz-score-circle">0%</div>
+                                        <div class="skillsprint-quiz-score-text">
+                                            <div class="skillsprint-quiz-score-label"><?php esc_html_e('Your Score', 'skillsprint'); ?></div>
+                                            <div class="skillsprint-quiz-score-value"></div>
+                                        </div>
+                                    </div>
+                                    <ul class="skillsprint-quiz-summary"></ul>
+                                    <div class="skillsprint-quiz-actions">
+                                        <button class="skillsprint-button retry-quiz"><?php esc_html_e('Retry', 'skillsprint'); ?></button>
+                                        <button class="skillsprint-button secondary review-quiz"><?php esc_html_e('Review', 'skillsprint'); ?></button>
+                                    </div>
+                                </div>
                             </div>
                         <?php endif; ?>
                     <?php endif; ?>
@@ -328,10 +373,10 @@ if ($user_id) {
                     <div class="skillsprint-day-actions">
                         <div class="skillsprint-day-navigation">
                             <button class="skillsprint-button outline small skillsprint-day-nav-prev" <?php echo $day_number === 1 ? 'disabled' : ''; ?>>
-                                <i class="dashicons dashicons-arrow-left-alt"></i> Previous Day
+                                <i class="dashicons dashicons-arrow-left-alt"></i> <?php esc_html_e('Previous Day', 'skillsprint'); ?>
                             </button>
                             <button class="skillsprint-button outline small skillsprint-day-nav-next" <?php echo $day_number === count($days_data) ? 'disabled' : ''; ?>>
-                                Next Day <i class="dashicons dashicons-arrow-right-alt"></i>
+                                <?php esc_html_e('Next Day', 'skillsprint'); ?> <i class="dashicons dashicons-arrow-right-alt"></i>
                             </button>
                         </div>
                         
@@ -350,19 +395,28 @@ if ($user_id) {
                         if ($is_completed) {
                             ?>
                             <button class="skillsprint-button success skillsprint-complete-day-button" disabled>
-                                Day Completed
+                                <?php esc_html_e('Day Completed', 'skillsprint'); ?>
                             </button>
                             <?php
                         } elseif ($user_id) {
+                            // For quiz days, check if quiz is passed
+                            $quiz_required = !empty($quiz_id) && isset($quiz_data) && !empty($quiz_data['questions']);
+                            $quiz_passed = $quiz_required && isset($quiz_passed) ? $quiz_passed : false;
+                            $disabled = $quiz_required && !$quiz_passed ? 'disabled' : '';
                             ?>
-                            <button class="skillsprint-button skillsprint-complete-day-button" data-day="<?php echo esc_attr($day_number); ?>" data-blueprint="<?php echo esc_attr($post->ID); ?>" <?php echo !empty($quiz_id) ? 'data-quiz="' . esc_attr($quiz_id) . '"' : ''; ?>>
-                                Complete This Day
+                            <button class="skillsprint-button skillsprint-complete-day-button" data-day="<?php echo esc_attr($day_number); ?>" data-blueprint="<?php echo esc_attr($post->ID); ?>" <?php echo $disabled; ?>>
+                                <?php esc_html_e('Complete This Day', 'skillsprint'); ?>
                             </button>
+                            <?php if ($quiz_required && !$quiz_passed) : ?>
+                                <p class="skillsprint-quiz-required-message">
+                                    <?php esc_html_e('You need to pass the quiz to complete this day.', 'skillsprint'); ?>
+                                </p>
+                            <?php endif; ?>
                             <?php
                         } else {
                             ?>
                             <button class="skillsprint-button skillsprint-login-button">
-                                Log In to Track Progress
+                                <?php esc_html_e('Log In to Track Progress', 'skillsprint'); ?>
                             </button>
                             <?php
                         }
@@ -375,3 +429,8 @@ if ($user_id) {
         </div>
     </div>
 </div>
+
+<?php if (!is_user_logged_in()) : ?>
+    <?php include_once SKILLSPRINT_PLUGIN_DIR . 'public/partials/login-modal.php'; ?>
+    <?php include_once SKILLSPRINT_PLUGIN_DIR . 'public/partials/register-modal.php'; ?>
+<?php endif; ?>

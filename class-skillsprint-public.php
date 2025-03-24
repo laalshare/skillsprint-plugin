@@ -312,28 +312,32 @@ private function has_skillsprint_shortcode() {
 public function filter_blueprint_content($content) {
     global $post;
     
-    // Basic validation
-    if (!is_object($post) || !isset($post->post_type) || $post->post_type !== 'blueprint') {
-        return $content;
+    if (is_singular('blueprint') && $post->post_type === 'blueprint') {
+        // Increment view count
+        SkillSprint_Blueprint::increment_view_count($post->ID);
+        
+        // Get settings
+        $settings = get_option('skillsprint_settings');
+        $days_free_access = isset($settings['days_free_access']) ? intval($settings['days_free_access']) : 2;
+        
+        // Get days data
+        $days_data = SkillSprint_DB::get_blueprint_days_data($post->ID);
+        
+        // Get user progress if logged in
+        $user_id = get_current_user_id();
+        $user_progress = array();
+        
+        if ($user_id) {
+            $user_progress = SkillSprint_DB::get_user_blueprint_progress($user_id, $post->ID);
+        }
+        
+        // Use output buffering to avoid memory issues
+        ob_start();
+        include SKILLSPRINT_PLUGIN_DIR . 'public/partials/blueprint-content.php';
+        return ob_get_clean();
     }
     
-    // Only apply on single blueprint pages
-    if (!is_singular('blueprint')) {
-        return $content;
-    }
-    
-    // Return simple content format
-    return '<div class="skillsprint-blueprint">
-        <div class="skillsprint-blueprint-header">
-            <h1>' . get_the_title() . '</h1>
-            <div class="skillsprint-blueprint-meta">
-                <span>' . get_the_date() . '</span>
-            </div>
-        </div>
-        <div class="skillsprint-blueprint-content">
-            ' . $content . '
-        </div>
-    </div>';
+    return $content;
 }
 
     /**

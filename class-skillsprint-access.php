@@ -49,6 +49,15 @@ class SkillSprint_Access {
      * @since    1.0.0
      */
     public function add_login_registration_modals() {
-        // Do nothing for now
+        // Only add on blueprint pages or when our shortcodes are present
+        if (is_singular('blueprint') || 
+            is_post_type_archive('blueprint') || 
+            is_tax('blueprint_category') || 
+            is_tax('blueprint_tag') || 
+            is_tax('blueprint_difficulty')) {
+            
+            include SKILLSPRINT_PLUGIN_DIR . 'public/partials/login-modal.php';
+            include SKILLSPRINT_PLUGIN_DIR . 'public/partials/register-modal.php';
+        }
     }
 }

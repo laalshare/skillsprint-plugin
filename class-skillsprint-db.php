@@ -17,34 +17,29 @@
 class SkillSprint_DB {
 
     /**
-     * Get user progress for a specific blueprint.
-     *
-     * @since    1.0.0
-     * @param    int    $user_id      The user ID.
-     * @param    int    $blueprint_id The blueprint ID.
-     * @return   array  User progress data.
-     */
-    public static function get_user_blueprint_progress($user_id, $blueprint_id) {
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'skillsprint_progress';
-        
-        // Limit to important fields only to reduce memory usage
-        $results = $wpdb->get_results(
-            $wpdb->prepare(
-                "SELECT user_id, blueprint_id, day_number, progress_status, date_completed 
-                 FROM {$table_name} 
-                 WHERE user_id = %d AND blueprint_id = %d 
-                 ORDER BY day_number ASC 
-                 LIMIT 10",  // Added a safety limit
-                $user_id,
-                $blueprint_id
-            ),
-            ARRAY_A
-        );
-        
-        return $results ? $results : array();
-    }
+ * Get user progress for a specific blueprint.
+ *
+ * @since    1.0.0
+ * @param    int    $user_id      The user ID.
+ * @param    int    $blueprint_id The blueprint ID.
+ * @return   array  User progress data.
+ */
+public static function get_user_blueprint_progress($user_id, $blueprint_id) {
+    global $wpdb;
+    
+    $table_name = $wpdb->prefix . 'skillsprint_progress';
+    
+    $results = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT * FROM $table_name WHERE user_id = %d AND blueprint_id = %d ORDER BY day_number ASC",
+            $user_id,
+            $blueprint_id
+        ),
+        ARRAY_A
+    );
+    
+    return $results;
+}
     
     /**
      * Get user progress for a specific day of a blueprint.
@@ -129,70 +124,70 @@ class SkillSprint_DB {
     }
     
     /**
-     * Mark a day as completed for a user.
-     *
-     * @since    1.0.0
-     * @param    int    $user_id      The user ID.
-     * @param    int    $blueprint_id The blueprint ID.
-     * @param    int    $day_number   The day number.
-     * @param    string $notes        Optional notes about completion.
-     * @return   bool   Whether the operation was successful.
-     */
-    public static function mark_day_completed( $user_id, $blueprint_id, $day_number, $notes = '' ) {
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'skillsprint_progress';
-        
-        // Check if entry already exists
-        $existing = self::get_user_day_progress( $user_id, $blueprint_id, $day_number );
-        
-        if ( $existing ) {
-            // Update existing entry
-            $result = $wpdb->update(
-                $table_name,
-                array(
-                    'progress_status' => 'completed',
-                    'date_completed' => current_time( 'mysql' ),
-                    'notes' => $notes
-                ),
-                array(
-                    'user_id' => $user_id,
-                    'blueprint_id' => $blueprint_id,
-                    'day_number' => $day_number
-                ),
-                array( '%s', '%s', '%s' ),
-                array( '%d', '%d', '%d' )
-            );
-        } else {
-            // Create new entry (rare case if day was never marked as started)
-            $result = $wpdb->insert(
-                $table_name,
-                array(
-                    'user_id' => $user_id,
-                    'blueprint_id' => $blueprint_id,
-                    'day_number' => $day_number,
-                    'progress_status' => 'completed',
-                    'date_started' => current_time( 'mysql' ),
-                    'date_completed' => current_time( 'mysql' ),
-                    'notes' => $notes
-                ),
-                array( '%d', '%d', '%d', '%s', '%s', '%s', '%s' )
-            );
-        }
-        
-        if ( $result !== false ) {
-            // Fire action to notify that day was completed
-            do_action( 'skillsprint_day_completed', $user_id, $blueprint_id, $day_number );
-            
-            // Check if all days are completed
-            if ( self::check_blueprint_completion( $user_id, $blueprint_id ) ) {
-                // Fire action to notify that blueprint was completed
-                do_action( 'skillsprint_blueprint_completed', $user_id, $blueprint_id );
-            }
-        }
-        
-        return $result !== false;
+ * Mark a day as completed for a user.
+ *
+ * @since    1.0.0
+ * @param    int    $user_id      The user ID.
+ * @param    int    $blueprint_id The blueprint ID.
+ * @param    int    $day_number   The day number.
+ * @param    string $notes        Optional notes about completion.
+ * @return   bool   Whether the operation was successful.
+ */
+public static function mark_day_completed($user_id, $blueprint_id, $day_number, $notes = '') {
+    global $wpdb;
+    
+    $table_name = $wpdb->prefix . 'skillsprint_progress';
+    
+    // Check if entry already exists
+    $existing = self::get_user_day_progress($user_id, $blueprint_id, $day_number);
+    
+    if ($existing) {
+        // Update existing entry
+        $result = $wpdb->update(
+            $table_name,
+            array(
+                'progress_status' => 'completed',
+                'date_completed' => current_time('mysql'),
+                'notes' => $notes
+            ),
+            array(
+                'user_id' => $user_id,
+                'blueprint_id' => $blueprint_id,
+                'day_number' => $day_number
+            ),
+            array('%s', '%s', '%s'),
+            array('%d', '%d', '%d')
+        );
+    } else {
+        // Create new entry (if day was never marked as started)
+        $result = $wpdb->insert(
+            $table_name,
+            array(
+                'user_id' => $user_id,
+                'blueprint_id' => $blueprint_id,
+                'day_number' => $day_number,
+                'progress_status' => 'completed',
+                'date_started' => current_time('mysql'),
+                'date_completed' => current_time('mysql'),
+                'notes' => $notes
+            ),
+            array('%d', '%d', '%d', '%s', '%s', '%s', '%s')
+        );
     }
+    
+    if ($result !== false) {
+        // Fire action to notify that day was completed
+        do_action('skillsprint_day_completed', $user_id, $blueprint_id, $day_number);
+        
+        // Check if all days are completed
+        if (self::check_blueprint_completion($user_id, $blueprint_id)) {
+            // Fire action to notify that blueprint was completed
+            do_action('skillsprint_blueprint_completed', $user_id, $blueprint_id);
+        }
+    }
+    
+    return $result !== false;
+}
     
     /**
  * Check if a blueprint is completed by a user.
@@ -321,42 +316,42 @@ public static function get_blueprint_completion_percentage($user_id, $blueprint_
     }
     
     /**
-     * Save quiz response.
-     *
-     * @since    1.0.0
-     * @param    int     $user_id      The user ID.
-     * @param    int     $blueprint_id The blueprint ID.
-     * @param    string  $quiz_id      The quiz ID.
-     * @param    string  $question_id  The question ID.
-     * @param    string  $user_answer  The user's answer.
-     * @param    bool    $is_correct   Whether the answer is correct.
-     * @param    int     $points       Points earned.
-     * @param    int     $attempt      Attempt number.
-     * @return   bool    Whether the operation was successful.
-     */
-    public static function save_quiz_response( $user_id, $blueprint_id, $quiz_id, $question_id, $user_answer, $is_correct, $points = 0, $attempt = 1 ) {
-        global $wpdb;
-        
-        $table_name = $wpdb->prefix . 'skillsprint_quiz_responses';
-        
-        $result = $wpdb->insert(
-            $table_name,
-            array(
-                'user_id' => $user_id,
-                'blueprint_id' => $blueprint_id,
-                'quiz_id' => $quiz_id,
-                'question_id' => $question_id,
-                'user_answer' => $user_answer,
-                'is_correct' => $is_correct ? 1 : 0,
-                'points_earned' => $points,
-                'attempt_number' => $attempt,
-                'date_submitted' => current_time( 'mysql' )
-            ),
-            array( '%d', '%d', '%s', '%s', '%s', '%d', '%d', '%d', '%s' )
-        );
-        
-        return $result !== false;
-    }
+ * Save quiz response.
+ *
+ * @since    1.0.0
+ * @param    int     $user_id      The user ID.
+ * @param    int     $blueprint_id The blueprint ID.
+ * @param    string  $quiz_id      The quiz ID.
+ * @param    string  $question_id  The question ID.
+ * @param    string  $user_answer  The user's answer.
+ * @param    bool    $is_correct   Whether the answer is correct.
+ * @param    int     $points       Points earned.
+ * @param    int     $attempt      Attempt number.
+ * @return   bool    Whether the operation was successful.
+ */
+public static function save_quiz_response($user_id, $blueprint_id, $quiz_id, $question_id, $user_answer, $is_correct, $points = 0, $attempt = 1) {
+    global $wpdb;
+    
+    $table_name = $wpdb->prefix . 'skillsprint_quiz_responses';
+    
+    $result = $wpdb->insert(
+        $table_name,
+        array(
+            'user_id' => $user_id,
+            'blueprint_id' => $blueprint_id,
+            'quiz_id' => $quiz_id,
+            'question_id' => $question_id,
+            'user_answer' => $user_answer,
+            'is_correct' => $is_correct ? 1 : 0,
+            'points_earned' => $points,
+            'attempt_number' => $attempt,
+            'date_submitted' => current_time('mysql')
+        ),
+        array('%d', '%d', '%s', '%s', '%s', '%d', '%d', '%d', '%s')
+    );
+    
+    return $result !== false;
+}
     
     /**
      * Get quiz responses for a user.
