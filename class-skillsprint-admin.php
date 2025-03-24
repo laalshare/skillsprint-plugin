@@ -300,66 +300,65 @@ class SkillSprint_Admin {
      * @since    1.0.0
      * @param    WP_Post $post The post object.
      */
-    public function render_blueprint_settings_metabox( $post ) {
-        wp_nonce_field( 'skillsprint_blueprint_settings_metabox', 'skillsprint_blueprint_settings_nonce' );
+    public function render_blueprint_settings_metabox($post) {
+        // Add nonce for security
+        wp_nonce_field('skillsprint_blueprint_settings', 'skillsprint_nonce');
         
-        $estimated_completion_time = get_post_meta( $post->ID, '_skillsprint_estimated_completion_time', true );
-        $recommended_background = get_post_meta( $post->ID, '_skillsprint_recommended_background', true );
-        $prerequisites = get_post_meta( $post->ID, '_skillsprint_prerequisites', true );
-        $what_youll_learn = get_post_meta( $post->ID, '_skillsprint_what_youll_learn', true );
+        // Get saved values
+        $estimated_time = get_post_meta($post->ID, '_skillsprint_estimated_time', true);
+        $prerequisites = get_post_meta($post->ID, '_skillsprint_prerequisites', true);
         
-        include SKILLSPRINT_PLUGIN_DIR . 'admin/partials/blueprint-settings-metabox.php';
+        // Output fields
+        ?>
+        <div class="skillsprint-meta-field">
+            <label for="skillsprint_estimated_time"><?php _e('Estimated Time', 'skillsprint'); ?></label>
+            <input type="text" id="skillsprint_estimated_time" name="skillsprint_estimated_time" value="<?php echo esc_attr($estimated_time); ?>">
+            <p class="description"><?php _e('Estimated time to complete this blueprint (e.g., "7 days, 30 minutes per day")', 'skillsprint'); ?></p>
+        </div>
+        
+        <div class="skillsprint-meta-field">
+            <label for="skillsprint_prerequisites"><?php _e('Prerequisites', 'skillsprint'); ?></label>
+            <textarea id="skillsprint_prerequisites" name="skillsprint_prerequisites" rows="3"><?php echo esc_textarea($prerequisites); ?></textarea>
+            <p class="description"><?php _e('What knowledge or tools are required before starting this blueprint', 'skillsprint'); ?></p>
+        </div>
+        <?php
     }
     
-    /**
-     * Save metabox data.
-     *
-     * @since    1.0.0
-     * @param    int $post_id The post ID.
-     */
-    public function save_metabox_data( $post_id ) {
-        // Check if our nonce is set
-        if ( ! isset( $_POST['skillsprint_blueprint_days_nonce'] ) || ! isset( $_POST['skillsprint_blueprint_settings_nonce'] ) ) {
-            return;
-        }
-        
-        // Verify the nonces
-        if ( ! wp_verify_nonce( $_POST['skillsprint_blueprint_days_nonce'], 'skillsprint_blueprint_days_metabox' ) ||
-             ! wp_verify_nonce( $_POST['skillsprint_blueprint_settings_nonce'], 'skillsprint_blueprint_settings_metabox' ) ) {
-            return;
-        }
-        
-        // If this is an autosave, our form has not been submitted, so we don't want to do anything
-        if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
-            return;
-        }
-        
-        // Check the user's permissions
-        if ( 'blueprint' === $_POST['post_type'] ) {
-            if ( ! current_user_can( 'edit_post', $post_id ) ) {
-                return;
-            }
-        }
-        
-        // Save blueprint settings
-        if ( isset( $_POST['skillsprint_estimated_completion_time'] ) ) {
-            update_post_meta( $post_id, '_skillsprint_estimated_completion_time', sanitize_text_field( $_POST['skillsprint_estimated_completion_time'] ) );
-        }
-        
-        if ( isset( $_POST['skillsprint_recommended_background'] ) ) {
-            update_post_meta( $post_id, '_skillsprint_recommended_background', sanitize_textarea_field( $_POST['skillsprint_recommended_background'] ) );
-        }
-        
-        if ( isset( $_POST['skillsprint_prerequisites'] ) ) {
-            update_post_meta( $post_id, '_skillsprint_prerequisites', sanitize_textarea_field( $_POST['skillsprint_prerequisites'] ) );
-        }
-        
-        if ( isset( $_POST['skillsprint_what_youll_learn'] ) ) {
-            update_post_meta( $post_id, '_skillsprint_what_youll_learn', sanitize_textarea_field( $_POST['skillsprint_what_youll_learn'] ) );
-        }
-        
-        // Days data is handled via AJAX for better UX
+/**
+ * Save meta box data.
+ */
+public function save_meta_box_data($post_id) {
+    // Check if our nonce is set
+    if (!isset($_POST['skillsprint_nonce'])) {
+        return;
     }
+    
+    // Verify the nonce
+    if (!wp_verify_nonce($_POST['skillsprint_nonce'], 'skillsprint_blueprint_settings')) {
+        return;
+    }
+    
+    // If this is an autosave, our form has not been submitted, so we don't want to do anything
+    if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+        return;
+    }
+    
+    // Check the user's permissions
+    if (isset($_POST['post_type']) && 'blueprint' === $_POST['post_type']) {
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+    }
+    
+    // Save data
+    if (isset($_POST['skillsprint_estimated_time'])) {
+        update_post_meta($post_id, '_skillsprint_estimated_time', sanitize_text_field($_POST['skillsprint_estimated_time']));
+    }
+    
+    if (isset($_POST['skillsprint_prerequisites'])) {
+        update_post_meta($post_id, '_skillsprint_prerequisites', sanitize_textarea_field($_POST['skillsprint_prerequisites']));
+    }
+}
     
     /**
      * AJAX handler for saving blueprint data.

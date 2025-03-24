@@ -110,6 +110,18 @@ class SkillSprint {
      * @since    1.0.0
      * @access   private
      */
+
+     /**
+ * Register admin scripts and styles.
+ */
+public function admin_enqueue_scripts($hook) {
+    // Only load on blueprint edit screens
+    $screen = get_current_screen();
+    if ($screen && $screen->post_type === 'blueprint') {
+        wp_enqueue_style('skillsprint-admin', SKILLSPRINT_PLUGIN_URL . 'admin/css/skillsprint-admin.css', array(), SKILLSPRINT_VERSION);
+        wp_enqueue_script('skillsprint-admin', SKILLSPRINT_PLUGIN_URL . 'admin/js/skillsprint-admin.js', array('jquery'), SKILLSPRINT_VERSION, true);
+    }
+}
     private function define_admin_hooks() {
         $plugin_admin = new SkillSprint_Admin($this->get_plugin_name(), $this->get_version());
 

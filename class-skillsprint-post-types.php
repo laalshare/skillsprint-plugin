@@ -87,26 +87,23 @@ class SkillSprint_Post_Types {
         
         // Blueprint Category Taxonomy
         $labels = array(
-            'name'                       => _x( 'Blueprint Categories', 'Taxonomy General Name', 'skillsprint' ),
-            'singular_name'              => _x( 'Blueprint Category', 'Taxonomy Singular Name', 'skillsprint' ),
-            'menu_name'                  => __( 'Categories', 'skillsprint' ),
-            'all_items'                  => __( 'All Categories', 'skillsprint' ),
-            'parent_item'                => __( 'Parent Category', 'skillsprint' ),
-            'parent_item_colon'          => __( 'Parent Category:', 'skillsprint' ),
-            'new_item_name'              => __( 'New Category Name', 'skillsprint' ),
-            'add_new_item'               => __( 'Add New Category', 'skillsprint' ),
-            'edit_item'                  => __( 'Edit Category', 'skillsprint' ),
-            'update_item'                => __( 'Update Category', 'skillsprint' ),
-            'view_item'                  => __( 'View Category', 'skillsprint' ),
-            'separate_items_with_commas' => __( 'Separate categories with commas', 'skillsprint' ),
-            'add_or_remove_items'        => __( 'Add or remove categories', 'skillsprint' ),
-            'choose_from_most_used'      => __( 'Choose from the most used', 'skillsprint' ),
-            'popular_items'              => __( 'Popular Categories', 'skillsprint' ),
-            'search_items'               => __( 'Search Categories', 'skillsprint' ),
-            'not_found'                  => __( 'Not Found', 'skillsprint' ),
-            'no_terms'                   => __( 'No categories', 'skillsprint' ),
-            'items_list'                 => __( 'Categories list', 'skillsprint' ),
-            'items_list_navigation'      => __( 'Categories list navigation', 'skillsprint' ),
+            'name'                       => _x('Blueprint Categories', 'Taxonomy General Name', 'skillsprint'),
+            'singular_name'              => _x('Blueprint Category', 'Taxonomy Singular Name', 'skillsprint'),
+            'menu_name'                  => __('Categories', 'skillsprint'),
+            'all_items'                  => __('All Categories', 'skillsprint'),
+            'parent_item'                => __('Parent Category', 'skillsprint'),
+            'parent_item_colon'          => __('Parent Category:', 'skillsprint'),
+            'new_item_name'              => __('New Category Name', 'skillsprint'),
+            'add_new_item'               => __('Add New Category', 'skillsprint'),
+            'edit_item'                  => __('Edit Category', 'skillsprint'),
+            'update_item'                => __('Update Category', 'skillsprint'),
+            'view_item'                  => __('View Category', 'skillsprint'),
+            'separate_items_with_commas' => __('Separate categories with commas', 'skillsprint'),
+            'add_or_remove_items'        => __('Add or remove categories', 'skillsprint'),
+            'choose_from_most_used'      => __('Choose from the most used', 'skillsprint'),
+            'popular_items'              => __('Popular Categories', 'skillsprint'),
+            'search_items'               => __('Search Categories', 'skillsprint'),
+            'not_found'                  => __('Not Found', 'skillsprint'),
         );
         
         $args = array(
@@ -121,11 +118,10 @@ class SkillSprint_Post_Types {
             'rewrite'                    => array(
                 'slug'                   => 'blueprint-category',
                 'with_front'             => false,
-                'hierarchical'           => true,
             ),
         );
         
-        register_taxonomy( 'blueprint_category', array( 'blueprint' ), $args );
+        register_taxonomy('blueprint_category', array('blueprint'), $args);
         
         // Blueprint Tag Taxonomy
         $labels = array(
