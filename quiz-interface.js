@@ -14,577 +14,461 @@
     class QuizInterface {
         /**
          * Constructor
-         * 
-         * @param {jQuery} $container The quiz container element
          */
-        constructor($container) {
-            this.$container = $container;
-            this.quizId = $container.data('quiz');
-            this.blueprintId = $container.data('blueprint');
-            this.$form = $container.find('.skillsprint-quiz-form');
-            this.$submitButton = this.$form.find('button[type="submit"]');
-            this.$message = this.$form.find('.skillsprint-quiz-message');
-            
-            this.init();
+        constructor() {
+            this.initQuizForms();
+            this.initQuizResults();
+            this.initQuizRetry();
         }
         
         /**
-         * Initialize the quiz interface
+         * Initialize quiz forms
          */
-        init() {
-            // Initialize form submission
-            this.initFormSubmission();
-            
-            // Initialize special question types
-            this.initSpecialQuestionTypes();
-            
-            // Check if user has already attempted the quiz
-            this.checkPreviousAttempts();
-        }
-        
-        /**
-         * Initialize form submission
-         */
-        initFormSubmission() {
+        initQuizForms() {
             const self = this;
             
-            this.$form.on('submit', function(e) {
+            $('.skillsprint-quiz-form').on('submit', function(e) {
                 e.preventDefault();
+                
+                const $form = $(this);
+                const $quiz = $form.closest('.skillsprint-quiz');
+                const $submitButton = $form.find('button[type="submit"]');
                 
                 // Check if user is logged in
                 if (!skillsprint.is_user_logged_in) {
-                    self.showLoginRequired();
+                    // Show login modal or message
+                    if (typeof showLoginModal === 'function') {
+                        showLoginModal();
+                    } else {
+                        alert(skillsprint.i18n.login_required);
+                    }
                     return;
                 }
                 
-                // Validate form
-                if (!self.validateForm()) {
-                    return;
-                }
+                // Disable submit button and show loading state
+                $submitButton.prop('disabled', true).html('<i class="dashicons dashicons-update spinning"></i> ' + skillsprint.i18n.submitting);
                 
-                // Disable button and show loading state
-                self.$submitButton.prop('disabled', true).text(skillsprint.i18n.saving);
-                self.$message.removeClass('success danger').empty();
-                
-                // Get form data
+                // Prepare form data
                 const formData = {
-                    blueprint_id: self.blueprintId,
-                    quiz_id: self.quizId,
-                    answers: self.collectAnswers(),
+                    action: 'skillsprint_submit_quiz',
                     nonce: skillsprint.nonce,
-                    action: 'skillsprint_submit_quiz'
+                    blueprint_id: $quiz.data('blueprint'),
+                    quiz_id: $quiz.data('quiz'),
+                    day_number: $quiz.data('day') || 1,
+                    answers: {}
                 };
+                
+                // Collect answers based on question type
+                $form.find('.skillsprint-question').each(function() {
+                    const $question = $(this);
+                    const questionId = $question.data('question');
+                    const questionType = $question.data('type');
+                    
+                    switch (questionType) {
+                        case 'multiple_choice':
+                        case 'true_false':
+                            // Get selected radio button value
+                            const radioValue = $question.find('input[type="radio"]:checked').val();
+                            if (radioValue) {
+                                formData.answers[questionId] = radioValue;
+                            }
+                            break;
+                            
+                        case 'multiple_answer':
+                            // Get all checked checkbox values
+                            const checkboxValues = [];
+                            $question.find('input[type="checkbox"]:checked').each(function() {
+                                checkboxValues.push($(this).val());
+                            });
+                            formData.answers[questionId] = checkboxValues;
+                            break;
+                            
+                        case 'matching':
+                            // Get matching pairs
+                            const matchingPairs = {};
+                            $question.find('select').each(function() {
+                                const $select = $(this);
+                                const leftValue = $select.data('left');
+                                const rightValue = $select.val();
+                                
+                                if (leftValue && rightValue) {
+                                    matchingPairs[leftValue] = rightValue;
+                                }
+                            });
+                            formData.answers[questionId] = matchingPairs;
+                            break;
+                            
+                        case 'short_answer':
+                            // Get text input value
+                            const textValue = $question.find('input[type="text"]').val();
+                            if (textValue) {
+                                formData.answers[questionId] = textValue;
+                            }
+                            break;
+                    }
+                });
                 
                 // Send AJAX request
                 $.post(skillsprint.ajax_url, formData, function(response) {
                     if (response.success) {
-                        // Display results
-                        self.displayResults(response.data);
-                        
-                        // Enable complete day button if quiz passed
-                        if (response.data.score.passed) {
-                            self.$container.data('passed', true);
-                            $('.skillsprint-complete-day-button[data-quiz="' + self.quizId + '"]').prop('disabled', false);
-                        }
+                        // Process successful quiz submission
+                        self.handleQuizSuccess($quiz, $form, response.data);
                     } else {
-                        self.$message.addClass('danger').text(response.data.message);
-                        self.$submitButton.prop('disabled', false).text(skillsprint.i18n.submit);
+                        // Handle error
+                        self.handleQuizError($quiz, $form, response.data.message);
                     }
-                }).fail(function() {
-                    self.$message.addClass('danger').text('An error occurred. Please try again.');
-                    self.$submitButton.prop('disabled', false).text(skillsprint.i18n.submit);
+                    
+                    // Re-enable submit button
+                    $submitButton.prop('disabled', false).text(skillsprint.i18n.submit_quiz);
+                }).fail(function(xhr, textStatus, errorThrown) {
+                    // Handle AJAX failure
+                    self.handleQuizError($quiz, $form, 'Failed to submit quiz: ' + errorThrown);
+                    $submitButton.prop('disabled', false).text(skillsprint.i18n.submit_quiz);
                 });
             });
         }
         
         /**
-         * Initialize special question types
-         */
-        initSpecialQuestionTypes() {
-            // Initialize matching questions
-            this.$form.find('.skillsprint-question[data-type="matching"]').each(function() {
-                const $question = $(this);
-                const $options = $question.find('.skillsprint-question-option');
-                
-                // Sort left column options
-                $options.find('select').each(function() {
-                    const $select = $(this);
-                    const $options = $select.find('option');
-                    
-                    // Skip the first "Select" option
-                    const $first = $options.first();
-                    const $rest = $options.slice(1);
-                    
-                    // Sort options alphabetically
-                    $rest.sort(function(a, b) {
-                        return $(a).text().localeCompare($(b).text());
-                    });
-                    
-                    // Reappend options
-                    $select.empty().append($first).append($rest);
-                });
-            });
-        }
-        
-        /**
-         * Check if user has previously attempted the quiz
-         */
-        checkPreviousAttempts() {
-            // Only check if user is logged in
-            if (!skillsprint.is_user_logged_in) {
-                return;
-            }
-            
-            const self = this;
-            
-            // Send AJAX request to get previous quiz results
-            $.post(skillsprint.ajax_url, {
-                action: 'skillsprint_get_quiz_results',
-                blueprint_id: this.blueprintId,
-                quiz_id: this.quizId,
-                nonce: skillsprint.nonce
-            }, function(response) {
-                if (response.success && response.data.has_attempts) {
-                    // Display previous results
-                    self.displayPreviousResults(response.data);
-                }
-            });
-        }
-        
-        /**
-         * Display previous quiz results
+         * Handle successful quiz submission
          * 
-         * @param {object} data Quiz results data
+         * @param {jQuery} $quiz  Quiz container element
+         * @param {jQuery} $form  Quiz form element
+         * @param {Object} data   Response data
          */
-        displayPreviousResults(data) {
-            const self = this;
+        handleQuizSuccess($quiz, $form, data) {
+            const score = data.score;
+            const questionResults = data.question_results;
             
-            // Create info message
-            const $infoMessage = $(`
-                <div class="skillsprint-alert">
-                    <h4 class="skillsprint-alert-title">Previous Attempt</h4>
-                    <p class="skillsprint-alert-message">
-                        You have previously attempted this quiz and scored ${data.score.percentage}%.
-                        ${data.score.passed ? 'You passed the quiz!' : 'You did not pass the quiz.'}
-                    </p>
-                    <div class="skillsprint-quiz-actions">
-                        <button class="skillsprint-button small view-results">View Results</button>
-                        ${!data.score.passed && data.score.attempt < data.score.max_attempts ? 
-                            `<button class="skillsprint-button small secondary new-attempt">Start New Attempt</button>` : 
-                            ''
-                        }
-                    </div>
-                </div>
-            `);
+            // Hide form temporarily
+            $form.hide();
             
-            this.$form.before($infoMessage);
-            
-            // View results button
-            $infoMessage.find('.view-results').on('click', function() {
-                self.displayResults(data);
-            });
-            
-            // New attempt button
-            $infoMessage.find('.new-attempt').on('click', function() {
-                $infoMessage.remove();
-                self.$form.show();
-            });
-            
-            // If quiz is passed, hide form and update container
-            if (data.score.passed) {
-                this.$form.hide();
-                this.$container.data('passed', true);
-                $('.skillsprint-complete-day-button[data-quiz="' + this.quizId + '"]').prop('disabled', false);
-            }
-        }
-        
-        /**
-         * Validate the quiz form
-         * 
-         * @return {boolean} Whether the form is valid
-         */
-        validateForm() {
-            let isValid = true;
-            
-            // Check each question
-            this.$form.find('.skillsprint-question').each(function() {
-                const $question = $(this);
-                const questionType = $question.data('type');
-                let questionAnswered = false;
-                
-                switch (questionType) {
-                    case 'multiple_choice':
-                    case 'true_false':
-                        questionAnswered = $question.find('input[type="radio"]:checked').length > 0;
-                        break;
-                        
-                    case 'multiple_answer':
-                        questionAnswered = $question.find('input[type="checkbox"]:checked').length > 0;
-                        break;
-                        
-                    case 'matching':
-                        questionAnswered = true;
-                        $question.find('select').each(function() {
-                            if (!$(this).val()) {
-                                questionAnswered = false;
-                            }
-                        });
-                        break;
-                        
-                    case 'short_answer':
-                        questionAnswered = $question.find('input[type="text"]').val().trim().length > 0;
-                        break;
-                }
-                
-                // Highlight unanswered questions
-                if (!questionAnswered) {
-                    $question.addClass('unanswered');
-                    isValid = false;
-                } else {
-                    $question.removeClass('unanswered');
-                }
-            });
-            
-            // Scroll to first unanswered question
-            if (!isValid) {
-                const $firstUnanswered = this.$form.find('.skillsprint-question.unanswered').first();
-                $('html, body').animate({
-                    scrollTop: $firstUnanswered.offset().top - 50
-                }, 300);
-                
-                this.$message.addClass('danger').text('Please answer all questions before submitting.');
-            }
-            
-            return isValid;
-        }
-        
-        /**
-         * Collect answers from the form
-         * 
-         * @return {object} Answers object
-         */
-        collectAnswers() {
-            const answers = {};
-            
-            // Collect answers based on question type
-            this.$form.find('.skillsprint-question').each(function() {
-                const $question = $(this);
-                const questionId = $question.data('question');
-                const questionType = $question.data('type');
-                
-                switch (questionType) {
-                    case 'multiple_choice':
-                    case 'true_false':
-                        answers[questionId] = $question.find('input[type="radio"]:checked').val();
-                        break;
-                        
-                    case 'multiple_answer':
-                        answers[questionId] = [];
-                        $question.find('input[type="checkbox"]:checked').each(function() {
-                            answers[questionId].push($(this).val());
-                        });
-                        break;
-                        
-                    case 'matching':
-                        answers[questionId] = {};
-                        $question.find('select').each(function() {
-                            const $select = $(this);
-                            answers[questionId][$select.data('left')] = $select.val();
-                        });
-                        break;
-                        
-                    case 'short_answer':
-                        answers[questionId] = $question.find('input[type="text"]').val().trim();
-                        break;
-                }
-            });
-            
-            return answers;
-        }
-        
-        /**
-         * Display quiz results
-         * 
-         * @param {object} data Quiz results data
-         */
-        displayResults(data) {
-            // Hide form
-            this.$form.hide();
-            
-            // Create results container
-            let $results = this.$container.find('.skillsprint-quiz-results');
-            if ($results.length) {
-                $results.empty();
+            // Show result panel
+            const $resultPanel = $quiz.find('.skillsprint-quiz-result');
+            if ($resultPanel.length > 0) {
+                this.updateResultPanel($resultPanel, score, questionResults);
             } else {
-                $results = $('<div>', {
-                    class: 'skillsprint-quiz-results'
-                });
-                this.$container.append($results);
+                this.createResultPanel($quiz, score, questionResults);
             }
             
-            // Create results content
-            $results.append(`
-                <h3 class="skillsprint-quiz-results-title">Quiz Results</h3>
-                <div class="skillsprint-quiz-score">
-                    <div class="skillsprint-quiz-score-circle">${data.score.percentage}%</div>
-                    <div class="skillsprint-quiz-score-text">
-                        <div class="skillsprint-quiz-score-label">Your Score</div>
-                        <div class="skillsprint-quiz-score-value ${data.score.passed ? 'passed' : 'failed'}">
-                            ${data.score.passed ? 'Passed' : 'Failed'} (${data.score.correct_count}/${data.score.total_questions} correct)
+            // Update question feedback
+            this.updateQuestionFeedback($form, questionResults);
+            
+            // If quiz is passed, enable completion button if exists
+            if (score.passed) {
+                $quiz.attr('data-passed', 'true');
+                $('.skillsprint-complete-day-button[data-day="' + ($quiz.data('day') || 1) + '"]').prop('disabled', false);
+            }
+        }
+        
+        /**
+         * Handle quiz submission error
+         * 
+         * @param {jQuery} $quiz    Quiz container element
+         * @param {jQuery} $form    Quiz form element
+         * @param {String} message  Error message
+         */
+        handleQuizError($quiz, $form, message) {
+            const $errorMessage = $form.find('.skillsprint-quiz-message');
+            
+            if ($errorMessage.length > 0) {
+                $errorMessage.addClass('error').text(message);
+            } else {
+                $form.prepend('<div class="skillsprint-quiz-message error">' + message + '</div>');
+            }
+            
+            // Scroll to error message
+            $('html, body').animate({
+                scrollTop: $errorMessage.offset().top - 100
+            }, 300);
+        }
+        
+        /**
+         * Create result panel
+         * 
+         * @param {jQuery} $quiz           Quiz container element
+         * @param {Object} score           Score data
+         * @param {Object} questionResults Question results data
+         */
+        createResultPanel($quiz, score, questionResults) {
+            // Create panel HTML
+            const resultTitle = score.passed ? 'Congratulations!' : 'Quiz Completed';
+            const resultFeedback = score.passed 
+                ? 'You passed the quiz! You can now mark this day as completed.' 
+                : 'You did not reach the passing score. You can review your answers and try again.';
+                
+            const $resultPanel = $(`
+                <div class="skillsprint-quiz-result">
+                    <div class="skillsprint-quiz-result-inner">
+                        <div class="skillsprint-quiz-result-header">
+                            <h4 class="skillsprint-quiz-result-title">${resultTitle}</h4>
+                            <div class="skillsprint-quiz-result-score">
+                                <div class="skillsprint-quiz-result-percentage">
+                                    <span class="percentage">${score.percentage}%</span>
+                                </div>
+                                <div class="skillsprint-quiz-result-correct">
+                                    ${score.correct_count} of ${score.total_questions} correct
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="skillsprint-quiz-result-feedback">
+                            <p>${resultFeedback}</p>
+                            <ul class="skillsprint-quiz-score-details">
+                                <li>
+                                    <span>Points Earned:</span>
+                                    <span>${score.earned_points}/${score.total_points}</span>
+                                </li>
+                                <li>
+                                    <span>Passing Score:</span>
+                                    <span>${score.passing_score}%</span>
+                                </li>
+                                <li>
+                                    <span>Attempt:</span>
+                                    <span>${score.attempt}/${score.max_attempts > 0 ? score.max_attempts : '∞'}</span>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div class="skillsprint-quiz-result-actions">
+                            <button type="button" class="skillsprint-button skillsprint-continue-button">
+                                ${skillsprint.i18n.continue}
+                            </button>
+                            ${!score.passed && (score.max_attempts === 0 || score.attempt < score.max_attempts) ? 
+                                `<button type="button" class="skillsprint-button secondary skillsprint-retry-button">
+                                    ${skillsprint.i18n.retry}
+                                </button>` : 
+                                ''
+                            }
                         </div>
                     </div>
-                </div>
-                <ul class="skillsprint-quiz-summary">
-                    <li>
-                        <span>Points Earned:</span>
-                        <span>${data.score.earned_points}/${data.score.total_points}</span>
-                    </li>
-                    <li>
-                        <span>Passing Score:</span>
-                        <span>${data.score.passing_score}%</span>
-                    </li>
-                    <li>
-                        <span>Attempt:</span>
-                        <span>${data.score.attempt}/${data.score.max_attempts}</span>
-                    </li>
-                </ul>
-                <div class="skillsprint-quiz-actions">
-                    ${!data.score.passed && data.score.attempt < data.score.max_attempts ? 
-                        `<button class="skillsprint-button retry-quiz">${skillsprint.i18n.retry}</button>` : 
-                        ''
-                    }
-                    <button class="skillsprint-button secondary review-quiz">${skillsprint.i18n.review}</button>
                 </div>
             `);
             
-            // Create detailed feedback
-            const $feedback = $('<div>', {
-                class: 'skillsprint-quiz-feedback',
-                css: { display: 'none' }
-            });
-            $results.append($feedback);
+            // Add result panel to quiz container
+            $quiz.append($resultPanel);
             
-            // Add event handlers
-            $results.find('.retry-quiz').on('click', () => {
-                this.retryQuiz();
-            });
-            
-            $results.find('.review-quiz').on('click', () => {
-                this.reviewQuiz(data, $feedback);
-            });
+            // Scroll to result panel
+            $('html, body').animate({
+                scrollTop: $resultPanel.offset().top - 100
+            }, 300);
         }
         
         /**
-         * Retry the quiz
-         */
-        retryQuiz() {
-            // Reset form
-            this.$form.trigger('reset');
-            this.$form.find('.skillsprint-question').removeClass('unanswered');
-            this.$message.removeClass('success danger').empty();
-            
-            // Show form
-            this.$form.show();
-            
-            // Hide results
-            this.$container.find('.skillsprint-quiz-results').hide();
-        }
-        
-        /**
-         * Review the quiz
+         * Update existing result panel
          * 
-         * @param {object} data     Quiz results data
-         * @param {jQuery} $feedback Feedback container
+         * @param {jQuery} $resultPanel    Result panel element
+         * @param {Object} score           Score data
+         * @param {Object} questionResults Question results data
          */
-        reviewQuiz(data, $feedback) {
-            // Create feedback content
-            $feedback.empty();
+        updateResultPanel($resultPanel, score, questionResults) {
+            // Update title and feedback
+            const resultTitle = score.passed ? 'Congratulations!' : 'Quiz Completed';
+            const resultFeedback = score.passed 
+                ? 'You passed the quiz! You can now mark this day as completed.' 
+                : 'You did not reach the passing score. You can review your answers and try again.';
+                
+            $resultPanel.find('.skillsprint-quiz-result-title').text(resultTitle);
+            $resultPanel.find('.skillsprint-quiz-result-percentage .percentage').text(score.percentage + '%');
+            $resultPanel.find('.skillsprint-quiz-result-correct').text(score.correct_count + ' of ' + score.total_questions + ' correct');
+            $resultPanel.find('.skillsprint-quiz-result-feedback p').text(resultFeedback);
             
-            // Add each question with feedback
-            this.$form.find('.skillsprint-question').each(function() {
+            // Update score details
+            $resultPanel.find('.skillsprint-quiz-score-details li:eq(0) span:eq(1)').text(score.earned_points + '/' + score.total_points);
+            $resultPanel.find('.skillsprint-quiz-score-details li:eq(1) span:eq(1)').text(score.passing_score + '%');
+            $resultPanel.find('.skillsprint-quiz-score-details li:eq(2) span:eq(1)').text(score.attempt + '/' + (score.max_attempts > 0 ? score.max_attempts : '∞'));
+            
+            // Update action buttons
+            const $actions = $resultPanel.find('.skillsprint-quiz-result-actions');
+            $actions.empty();
+            
+            $actions.append(`
+                <button type="button" class="skillsprint-button skillsprint-continue-button">
+                    ${skillsprint.i18n.continue}
+                </button>
+            `);
+            
+            if (!score.passed && (score.max_attempts === 0 || score.attempt < score.max_attempts)) {
+                $actions.append(`
+                    <button type="button" class="skillsprint-button secondary skillsprint-retry-button">
+                        ${skillsprint.i18n.retry}
+                    </button>
+                `);
+            }
+            
+            // Show the result panel
+            $resultPanel.show();
+            
+            // Scroll to result panel
+            $('html, body').animate({
+                scrollTop: $resultPanel.offset().top - 100
+            }, 300);
+        }
+        
+        /**
+         * Update question feedback
+         * 
+         * @param {jQuery} $form           Quiz form element
+         * @param {Object} questionResults Question results data
+         */
+        updateQuestionFeedback($form, questionResults) {
+            // Process each question
+            $form.find('.skillsprint-question').each(function() {
                 const $question = $(this);
                 const questionId = $question.data('question');
                 const questionType = $question.data('type');
-                const questionText = $question.find('.skillsprint-question-text').text();
-                const result = data.question_results[questionId];
                 
-                if (!result) {
-                    return;
-                }
-                
-                // Create question feedback
-                const $questionFeedback = $(`
-                    <div class="skillsprint-question-review">
-                        <h4>${questionText}</h4>
-                        <div class="skillsprint-question-status ${result.is_correct ? 'correct' : 'incorrect'}">
-                            ${result.is_correct ? 'Correct' : 'Incorrect'}
-                        </div>
-                    </div>
-                `);
-                
-                // Add explanation if available
-                if (result.explanation) {
-                    $questionFeedback.append(`
-                        <div class="skillsprint-question-explanation">
-                            <strong>Explanation:</strong> ${result.explanation}
+                // Check if we have results for this question
+                if (questionResults && questionResults[questionId]) {
+                    const result = questionResults[questionId];
+                    
+                    // Remove any existing feedback
+                    $question.find('.skillsprint-question-feedback').remove();
+                    $question.find('.skillsprint-question-option').removeClass('correct incorrect');
+                    
+                    // Add feedback based on question type
+                    switch (questionType) {
+                        case 'multiple_choice':
+                        case 'true_false':
+                            // Highlight correct and incorrect options
+                            $question.find('input[type="radio"]').each(function() {
+                                const $radio = $(this);
+                                const $option = $radio.closest('.skillsprint-question-option');
+                                const optionValue = $radio.val();
+                                
+                                if (optionValue == result.correct_answer) {
+                                    $option.addClass('correct');
+                                } else if ($radio.is(':checked')) {
+                                    $option.addClass('incorrect');
+                                }
+                            });
+                            break;
+                            
+                        case 'multiple_answer':
+                            // Highlight correct and incorrect options
+                            $question.find('input[type="checkbox"]').each(function() {
+                                const $checkbox = $(this);
+                                const $option = $checkbox.closest('.skillsprint-question-option');
+                                const optionValue = $checkbox.val();
+                                const isCorrectAnswer = Array.isArray(result.correct_answer) && 
+                                                      result.correct_answer.indexOf(optionValue) !== -1;
+                                const wasChecked = $checkbox.is(':checked');
+                                
+                                if (isCorrectAnswer) {
+                                    $option.addClass('correct');
+                                } else if (wasChecked) {
+                                    $option.addClass('incorrect');
+                                }
+                            });
+                            break;
+                            
+                        case 'matching':
+                            // Highlight correct and incorrect pairs
+                            $question.find('select').each(function() {
+                                const $select = $(this);
+                                const $option = $select.closest('.skillsprint-question-option');
+                                const leftValue = $select.data('left');
+                                const selectedValue = $select.val();
+                                const correctValue = result.correct_answer[leftValue];
+                                
+                                if (selectedValue === correctValue) {
+                                    $option.addClass('correct');
+                                } else {
+                                    $option.addClass('incorrect');
+                                }
+                            });
+                            break;
+                            
+                        case 'short_answer':
+                            // Highlight if answer was correct
+                            const $input = $question.find('input[type="text"]');
+                            const $option = $input.closest('.skillsprint-question-option');
+                            
+                            if (result.is_correct) {
+                                $option.addClass('correct');
+                            } else {
+                                $option.addClass('incorrect');
+                            }
+                            break;
+                    }
+                    
+                    // Add feedback text
+                    const feedbackClass = result.is_correct ? 'correct' : 'incorrect';
+                    let feedbackText = result.is_correct ? 
+                        'Correct!' : 
+                        'Incorrect. The correct answer is shown above.';
+                        
+                    // Add explanation if available
+                    if (!result.is_correct && result.explanation) {
+                        feedbackText += ' ' + result.explanation;
+                    }
+                    
+                    $question.append(`
+                        <div class="skillsprint-question-feedback ${feedbackClass}">
+                            ${feedbackText}
                         </div>
                     `);
                 }
-                
-                // Add question-specific feedback
-                switch (questionType) {
-                    case 'multiple_choice':
-                    case 'true_false':
-                        $questionFeedback.append(`
-                            <div class="skillsprint-question-answer">
-                                <strong>Your answer:</strong> ${$question.find(`input[value="${data.answers[questionId]}"]`).next().text()}
-                            </div>
-                            <div class="skillsprint-question-correct-answer">
-                                <strong>Correct answer:</strong> ${$question.find(`input[value="${result.correct_answer}"]`).next().text()}
-                            </div>
-                        `);
-                        break;
-                        
-                    case 'multiple_answer':
-                        // Get answer labels
-                        const userAnswerLabels = [];
-                        const correctAnswerLabels = [];
-                        
-                        $question.find('input[type="checkbox"]').each(function() {
-                            const $input = $(this);
-                            const label = $input.next().text();
-                            
-                            if (data.answers[questionId] && data.answers[questionId].includes($input.val())) {
-                                userAnswerLabels.push(label);
-                            }
-                            
-                            if (result.correct_answer.includes($input.val())) {
-                                correctAnswerLabels.push(label);
-                            }
-                        });
-                        
-                        $questionFeedback.append(`
-                            <div class="skillsprint-question-answer">
-                                <strong>Your answer:</strong> ${userAnswerLabels.join(', ') || 'None selected'}
-                            </div>
-                            <div class="skillsprint-question-correct-answer">
-                                <strong>Correct answer:</strong> ${correctAnswerLabels.join(', ')}
-                            </div>
-                        `);
-                        break;
-                        
-                    case 'matching':
-                        // Get answer pairs
-                        const userAnswerPairs = [];
-                        const correctAnswerPairs = [];
-                        
-                        $question.find('select').each(function() {
-                            const $select = $(this);
-                            const leftValue = $select.data('left');
-                            const leftLabel = $select.prev().text();
-                            
-                            // User answer
-                            if (data.answers[questionId] && data.answers[questionId][leftValue]) {
-                                const userRightValue = data.answers[questionId][leftValue];
-                                const userRightLabel = $select.find(`option[value="${userRightValue}"]`).text();
-                                userAnswerPairs.push(`${leftLabel} → ${userRightLabel}`);
-                            }
-                            
-                            // Correct answer
-                            if (result.correct_answer[leftValue]) {
-                                const correctRightValue = result.correct_answer[leftValue];
-                                const correctRightLabel = $select.find(`option[value="${correctRightValue}"]`).text();
-                                correctAnswerPairs.push(`${leftLabel} → ${correctRightLabel}`);
-                            }
-                        });
-                        
-                        $questionFeedback.append(`
-                            <div class="skillsprint-question-answer">
-                                <strong>Your answers:</strong>
-                                <ul>${userAnswerPairs.map(pair => `<li>${pair}</li>`).join('')}</ul>
-                            </div>
-                            <div class="skillsprint-question-correct-answer">
-                                <strong>Correct answers:</strong>
-                                <ul>${correctAnswerPairs.map(pair => `<li>${pair}</li>`).join('')}</ul>
-                            </div>
-                        `);
-                        break;
-                        
-                    case 'short_answer':
-                        $questionFeedback.append(`
-                            <div class="skillsprint-question-answer">
-                                <strong>Your answer:</strong> ${data.answers[questionId] || 'No answer provided'}
-                            </div>
-                            <div class="skillsprint-question-correct-answer">
-                                <strong>Acceptable answers:</strong> ${Array.isArray(result.correct_answer) ? result.correct_answer.join(', ') : result.correct_answer}
-                            </div>
-                        `);
-                        break;
-                }
-                
-                $feedback.append($questionFeedback);
             });
-            
-            // Show feedback
-            $feedback.show();
         }
         
         /**
-         * Show login required message
+         * Initialize quiz results handling
          */
-        showLoginRequired() {
-            // Create login modal
-            const $modal = $(`
-                <div class="skillsprint-modal-overlay active">
-                    <div class="skillsprint-modal">
-                        <div class="skillsprint-modal-header">
-                            <h3 class="skillsprint-modal-title">${skillsprint.i18n.login_required}</h3>
-                            <button class="skillsprint-modal-close">&times;</button>
-                        </div>
-                        <div class="skillsprint-modal-body">
-                            <p>${skillsprint.i18n.login_message}</p>
-                            <p>${skillsprint.i18n.please_login}</p>
-                        </div>
-                        <div class="skillsprint-modal-footer">
-                            <button class="skillsprint-button login-button">Log In</button>
-                            <button class="skillsprint-button secondary register-button">Register</button>
-                        </div>
-                    </div>
-                </div>
-            `);
-            
-            $('body').append($modal);
-            
-            // Close modal when clicking overlay or close button
-            $modal.on('click', function(e) {
-                if ($(e.target).hasClass('skillsprint-modal-overlay')) {
-                    $modal.remove();
-                }
+        initQuizResults() {
+            $(document).on('click', '.skillsprint-continue-button', function() {
+                const $quiz = $(this).closest('.skillsprint-quiz');
+                const $form = $quiz.find('.skillsprint-quiz-form');
+                const $result = $quiz.find('.skillsprint-quiz-result');
+                
+                // Hide result panel
+                $result.hide();
+                
+                // Show form with feedback
+                $form.show();
+                
+                // Disable all form inputs
+                $form.find('input, select, textarea, button[type="submit"]').prop('disabled', true);
             });
-            
-            $modal.find('.skillsprint-modal-close').on('click', function() {
-                $modal.remove();
-            });
-            
-            // Login button
-            $modal.find('.login-button').on('click', function() {
-                $modal.remove();
-                $('#skillsprint-login-modal').addClass('active');
-            });
-            
-            // Register button
-            $modal.find('.register-button').on('click', function() {
-                $modal.remove();
-                $('#skillsprint-register-modal').addClass('active');
+        }
+        
+        /**
+         * Initialize quiz retry functionality
+         */
+        initQuizRetry() {
+            $(document).on('click', '.skillsprint-retry-button', function() {
+                const $quiz = $(this).closest('.skillsprint-quiz');
+                const $form = $quiz.find('.skillsprint-quiz-form');
+                const $result = $quiz.find('.skillsprint-quiz-result');
+                
+                // Hide result panel
+                $result.hide();
+                
+                // Reset form
+                $form[0].reset();
+                
+                // Remove feedback
+                $form.find('.skillsprint-question-feedback').remove();
+                $form.find('.skillsprint-question-option').removeClass('correct incorrect');
+                
+                // Enable all form inputs
+                $form.find('input, select, textarea, button[type="submit"]').prop('disabled', false);
+                
+                // Show form
+                $form.show();
+                
+                // Scroll to form
+                $('html, body').animate({
+                    scrollTop: $form.offset().top - 100
+                }, 300);
             });
         }
     }
     
-    // Initialize quiz interfaces when document is ready
+    // Initialize when document is ready
     $(document).ready(function() {
-        $('.skillsprint-quiz').each(function() {
-            new QuizInterface($(this));
-        });
+        if ($('.skillsprint-quiz').length) {
+            new QuizInterface();
+        }
     });
 
 })(jQuery);

@@ -660,3 +660,101 @@
     --skillsprint-danger: #ef4444;
     --skillsprint-info: #3b82f6;
 }
+
+/**
+ * Dashboard widgets styles
+ */
+ .skillsprint-dashboard-widget {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    margin-bottom: 30px;
+    padding: 20px;
+}
+
+.skillsprint-dashboard-widget-title {
+    border-bottom: 1px solid #eee;
+    font-size: 18px;
+    font-weight: 600;
+    margin-top: 0;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+}
+
+/* Weekly progress chart */
+.skillsprint-weekly-chart-container {
+    margin: 20px 0;
+}
+
+.skillsprint-weekly-chart {
+    align-items: flex-end;
+    display: flex;
+    height: 150px;
+    justify-content: space-between;
+}
+
+.skillsprint-day-column {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    margin: 0 3px;
+}
+
+.skillsprint-day-column.active {
+    position: relative;
+}
+
+.skillsprint-day-column.active::before {
+    background-color: var(--skillsprint-primary-light);
+    bottom: 0;
+    content: "";
+    left: -5px;
+    position: absolute;
+    right: -5px;
+    top: 0;
+    z-index: 0;
+}
+
+.skillsprint-day-bar {
+    background-color: var(--skillsprint-primary);
+    border-radius: 4px 4px 0 0;
+    margin-bottom: 5px;
+    min-height: 4px;
+    position: relative;
+    width: 30px;
+    z-index: 1;
+}
+
+.skillsprint-day-label {
+    color: var(--skillsprint-gray);
+    font-size: 12px;
+    position: relative;
+    z-index: 1;
+}
+
+.skillsprint-weekly-summary {
+    border-top: 1px solid #eee;
+    margin-top: 20px;
+    padding-top: 15px;
+}
+
+.skillsprint-weekly-total {
+    display: flex;
+    justify-content: space-between;
+}
+
+/* Total time */
+.skillsprint-total-time {
+    background-color: var(--skillsprint-primary-light);
+    border-radius: 6px;
+    margin-top: 20px;
+    padding: 15px;
+    text-align: center;
+}
+
+.skillsprint-total-time p {
+    color: var(--skillsprint-primary-dark);
+    font-size: 15px;
+    margin: 0;
+}

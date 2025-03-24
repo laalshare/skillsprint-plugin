@@ -271,4 +271,323 @@ class SkillSprint_Dashboard {
         
         return isset( $achievements[$achievement_id] ) ? $achievements[$achievement_id] : false;
     }
+
+
+
+    /**
+     * Render dashboard statistics widget
+     *
+     * @param int $user_id User ID
+     */
+    public function render_statistics_widget($user_id) {
+        // Get user statistics
+        $stats = array(
+            'days_completed' => $this->get_days_completed_count($user_id),
+            'blueprints_completed' => $this->get_blueprints_completed_count($user_id),
+            'total_points' => SkillSprint_DB::get_user_total_points($user_id),
+            'current_streak' => $this->get_user_streak($user_id),
+            'quiz_accuracy' => $this->get_quiz_accuracy($user_id),
+            'total_time' => $this->get_total_learning_time($user_id)
+        );
+        
+        // Get user rank
+        $rank = get_user_meta($user_id, '_skillsprint_rank', true);
+        
+        ?>
+        <div class="skillsprint-dashboard-widget skillsprint-stats-widget">
+            <h3 class="skillsprint-dashboard-widget-title"><?php _e('Your Learning Statistics', 'skillsprint'); ?></h3>
+            
+            <div class="skillsprint-stats-grid">
+                <div class="skillsprint-stat-item">
+                    <div class="skillsprint-stat-value" data-stat="days_completed"><?php echo esc_html($stats['days_completed']); ?></div>
+                    <div class="skillsprint-stat-label"><?php _e('Days Completed', 'skillsprint'); ?></div>
+                </div>
+                
+                <div class="skillsprint-stat-item">
+                    <div class="skillsprint-stat-value" data-stat="blueprints_completed"><?php echo esc_html($stats['blueprints_completed']); ?></div>
+                    <div class="skillsprint-stat-label"><?php _e('Blueprints Completed', 'skillsprint'); ?></div>
+                </div>
+                
+                <div class="skillsprint-stat-item">
+                    <div class="skillsprint-stat-value" data-stat="total_points"><?php echo esc_html($stats['total_points']); ?></div>
+                    <div class="skillsprint-stat-label"><?php _e('Total Points', 'skillsprint'); ?></div>
+                </div>
+                
+                <div class="skillsprint-stat-item">
+                    <div class="skillsprint-stat-value" data-stat="current_streak"><?php echo esc_html($stats['current_streak']); ?></div>
+                    <div class="skillsprint-stat-label"><?php _e('Day Streak', 'skillsprint'); ?></div>
+                </div>
+                
+                <div class="skillsprint-stat-item">
+                    <div class="skillsprint-stat-value" data-stat="quiz_accuracy"><?php echo esc_html($stats['quiz_accuracy']); ?>%</div>
+                    <div class="skillsprint-stat-label"><?php _e('Quiz Accuracy', 'skillsprint'); ?></div>
+                </div>
+                
+                <div class="skillsprint-stat-item">
+                    <div class="skillsprint-stat-value" data-stat="rank"><?php echo $rank ? esc_html('#' . $rank) : '-'; ?></div>
+                    <div class="skillsprint-stat-label"><?php _e('Leaderboard Rank', 'skillsprint'); ?></div>
+                </div>
+            </div>
+            
+            <?php if ($stats['total_time'] > 0) : ?>
+                <div class="skillsprint-total-time">
+                    <p><?php printf(
+                        __('You have spent <strong>%s</strong> learning with us!', 'skillsprint'),
+                        $this->format_time_spent($stats['total_time'])
+                    ); ?></p>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render weekly progress widget
+     *
+     * @param int $user_id User ID
+     */
+    public function render_weekly_progress_widget($user_id) {
+        // Get progress data
+        $progress = new SkillSprint_Progress();
+        $weekly_data = $progress->get_weekly_progress($user_id);
+        
+        ?>
+        <div class="skillsprint-dashboard-widget skillsprint-weekly-widget">
+            <h3 class="skillsprint-dashboard-widget-title"><?php _e('This Week\'s Progress', 'skillsprint'); ?></h3>
+            
+            <div class="skillsprint-weekly-chart-container">
+                <div class="skillsprint-weekly-chart">
+                    <?php foreach ($weekly_data as $day) : 
+                        $height = $day['completed_days'] * 20; // 20px per completed day
+                        $active = date('Y-m-d') === $day['date'] ? 'active' : '';
+                        ?>
+                        <div class="skillsprint-day-column <?php echo $active; ?>" title="<?php printf(__('%s: %d days completed', 'skillsprint'), $day['day'], $day['completed_days']); ?>">
+                            <div class="skillsprint-day-bar" style="height: <?php echo $height; ?>px;"></div>
+                            <div class="skillsprint-day-label"><?php echo esc_html($day['day']); ?></div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            
+            <?php
+            // Calculate total for the week
+            $total_completed = array_sum(array_column($weekly_data, 'completed_days'));
+            $total_quizzes = array_sum(array_column($weekly_data, 'quiz_attempts'));
+            ?>
+            
+            <div class="skillsprint-weekly-summary">
+                <div class="skillsprint-weekly-total">
+                    <span><?php _e('This week:', 'skillsprint'); ?></span>
+                    <span><?php printf(_n('%d day completed', '%d days completed', $total_completed, 'skillsprint'), $total_completed); ?></span>
+                    <span><?php printf(_n('%d quiz taken', '%d quizzes taken', $total_quizzes, 'skillsprint'), $total_quizzes); ?></span>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Render achievements widget
+     *
+     * @param int $user_id User ID
+     */
+    public function render_achievements_widget($user_id) {
+        // Get user achievements
+        $achievements = SkillSprint_DB::get_user_achievements($user_id);
+        $gamification = new SkillSprint_Gamification();
+        
+        ?>
+        <div class="skillsprint-dashboard-widget skillsprint-achievements-widget">
+            <h3 class="skillsprint-dashboard-widget-title"><?php _e('Your Achievements', 'skillsprint'); ?></h3>
+            
+            <?php if (!empty($achievements)) : ?>
+                <div class="skillsprint-achievements-list">
+                    <?php foreach (array_slice($achievements, 0, 5) as $achievement) : 
+                        $badge = $gamification->get_badge_info($achievement['achievement_id']);
+                        ?>
+                        <div class="skillsprint-achievement">
+                            <div class="skillsprint-achievement-icon">
+                                <img src="<?php echo SKILLSPRINT_PLUGIN_URL; ?>public/images/badges/<?php echo esc_attr($badge['icon']); ?>.png" alt="<?php echo esc_attr($badge['name']); ?>">
+                            </div>
+                            <div class="skillsprint-achievement-content">
+                                <div class="skillsprint-achievement-title"><?php echo esc_html($badge['name']); ?></div>
+                                <div class="skillsprint-achievement-description"><?php echo esc_html($badge['description']); ?></div>
+                                <div class="skillsprint-achievement-date"><?php echo esc_html(date_i18n(get_option('date_format'), strtotime($achievement['date_earned']))); ?></div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                
+                <?php if (count($achievements) > 5) : ?>
+                    <div class="skillsprint-view-all">
+                        <a href="<?php echo esc_url(add_query_arg('view', 'achievements', get_permalink())); ?>"><?php printf(__('View all %d achievements', 'skillsprint'), count($achievements)); ?></a>
+                    </div>
+                <?php endif; ?>
+            <?php else : ?>
+                <div class="skillsprint-no-achievements">
+                    <p><?php _e('You haven\'t earned any achievements yet. Complete days and blueprints to earn achievements!', 'skillsprint'); ?></p>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Get days completed count
+     *
+     * @param int $user_id User ID
+     * @return int Days completed count
+     */
+    private function get_days_completed_count($user_id) {
+        global $wpdb;
+        
+        $progress_table = $wpdb->prefix . 'skillsprint_progress';
+        
+        $count = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM $progress_table WHERE user_id = %d AND progress_status = 'completed'",
+                $user_id
+            )
+        );
+        
+        return intval($count);
+    }
+
+    /**
+     * Get blueprints completed count
+     *
+     * @param int $user_id User ID
+     * @return int Blueprints completed count
+     */
+    private function get_blueprints_completed_count($user_id) {
+        global $wpdb;
+        
+        $progress_table = $wpdb->prefix . 'skillsprint_progress';
+        
+        // Get all blueprints with progress
+        $blueprint_progress = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT 
+                    blueprint_id,
+                    COUNT(*) as completed_days
+                FROM 
+                    $progress_table 
+                WHERE 
+                    user_id = %d AND 
+                    progress_status = 'completed'
+                GROUP BY 
+                    blueprint_id",
+                $user_id
+            ),
+            ARRAY_A
+        );
+        
+        $completed_count = 0;
+        
+        foreach ($blueprint_progress as $progress) {
+            // Get total days in blueprint
+            $days_data = SkillSprint_DB::get_blueprint_days_data($progress['blueprint_id']);
+            $total_days = count($days_data);
+            
+            // Check if all days are completed
+            if ($progress['completed_days'] >= $total_days) {
+                $completed_count++;
+            }
+        }
+        
+        return $completed_count;
+    }
+
+    /**
+     * Get user streak
+     *
+     * @param int $user_id User ID
+     * @return int Current streak
+     */
+    private function get_user_streak($user_id) {
+        $streak_info = SkillSprint_DB::get_user_streak($user_id);
+        
+        return isset($streak_info['current_streak']) ? intval($streak_info['current_streak']) : 0;
+    }
+
+    /**
+     * Get quiz accuracy
+     *
+     * @param int $user_id User ID
+     * @return int Quiz accuracy percentage
+     */
+    private function get_quiz_accuracy($user_id) {
+        global $wpdb;
+        
+        $quiz_table = $wpdb->prefix . 'skillsprint_quiz_responses';
+        
+        $total = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM $quiz_table WHERE user_id = %d",
+                $user_id
+            )
+        );
+        
+        $correct = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM $quiz_table WHERE user_id = %d AND is_correct = 1",
+                $user_id
+            )
+        );
+        
+        if ($total > 0) {
+            return round(($correct / $total) * 100);
+        }
+        
+        return 0;
+    }
+
+    /**
+     * Get total learning time
+     *
+     * @param int $user_id User ID
+     * @return int Total time in minutes
+     */
+    private function get_total_learning_time($user_id) {
+        global $wpdb;
+        
+        $progress_table = $wpdb->prefix . 'skillsprint_progress';
+        
+        $total_time = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT SUM(time_spent) FROM $progress_table WHERE user_id = %d",
+                $user_id
+            )
+        );
+        
+        return intval($total_time);
+    }
+
+    /**
+     * Format time spent
+     *
+     * @param int $minutes Time in minutes
+     * @return string Formatted time
+     */
+    private function format_time_spent($minutes) {
+        if ($minutes < 60) {
+            return sprintf(_n('%d minute', '%d minutes', $minutes, 'skillsprint'), $minutes);
+        }
+        
+        $hours = floor($minutes / 60);
+        $remaining_minutes = $minutes % 60;
+        
+        if ($remaining_minutes == 0) {
+            return sprintf(_n('%d hour', '%d hours', $hours, 'skillsprint'), $hours);
+        }
+        
+        return sprintf(
+            __('%d hour %d minute', '%d hours %d minutes', $hours, 'skillsprint'), 
+            $hours, 
+            $remaining_minutes
+        );
+    }
+
+
+
 }

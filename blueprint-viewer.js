@@ -566,6 +566,122 @@
                 $modal.remove();
             });
         }
+
+
+        /**
+ * Initialize time tracking
+ */
+initTimeTracking() {
+    this.activeDay = null;
+    this.startTime = null;
+    this.isTracking = false;
+    this.timeSpent = 0;
+    this.trackingInterval = null;
+    
+    // Start tracking when day tab is clicked
+    this.$dayTabs.on('click', (e) => {
+        const $tab = $(e.currentTarget);
+        const dayNumber = $tab.data('day');
+        
+        this.startTrackingDay(dayNumber);
+    });
+    
+    // Track when user leaves page
+    $(window).on('beforeunload', () => {
+        this.pauseTracking();
+        this.saveTimeSpent();
+    });
+    
+    // Resume tracking on focus/visibility change
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+            this.resumeTracking();
+        } else {
+            this.pauseTracking();
+            this.saveTimeSpent();
+        }
+    });
+    
+    // Initial tracking for active day
+    const $activeTab = this.$dayTabs.filter('.active');
+    if ($activeTab.length) {
+        this.startTrackingDay($activeTab.data('day'));
+    }
+}
+
+/**
+ * Start tracking time for a day
+ * 
+ * @param {number} dayNumber Day number
+ */
+startTrackingDay(dayNumber) {
+    // Save time for previous day if switching days
+    if (this.activeDay && this.activeDay !== dayNumber) {
+        this.saveTimeSpent();
+    }
+    
+    this.activeDay = dayNumber;
+    this.startTime = new Date();
+    this.isTracking = true;
+    this.timeSpent = 0;
+    
+    // Clear previous interval if exists
+    if (this.trackingInterval) {
+        clearInterval(this.trackingInterval);
+    }
+    
+    // Start interval for periodic saving
+    this.trackingInterval = setInterval(() => {
+        this.saveTimeSpent();
+    }, 60000); // Save every minute
+}
+
+/**
+ * Pause time tracking
+ */
+pauseTracking() {
+    if (this.isTracking && this.startTime) {
+        const now = new Date();
+        this.timeSpent += (now - this.startTime) / 1000; // in seconds
+        this.isTracking = false;
+    }
+}
+
+/**
+ * Resume time tracking
+ */
+resumeTracking() {
+    if (!this.isTracking && this.activeDay) {
+        this.startTime = new Date();
+        this.isTracking = true;
+    }
+}
+
+/**
+ * Save time spent on current day
+ */
+saveTimeSpent() {
+    // Calculate time spent so far
+    if (this.isTracking && this.startTime) {
+        const now = new Date();
+        this.timeSpent += (now - this.startTime) / 1000;
+        this.startTime = now;
+    }
+    
+    // Only save if we have accumulated some time and user is logged in
+    if (this.timeSpent > 5 && this.activeDay && skillsprint.is_user_logged_in) {
+        $.post(skillsprint.ajax_url, {
+            action: 'skillsprint_track_time_spent',
+            nonce: skillsprint.nonce,
+            blueprint_id: this.blueprintId,
+            day_number: this.activeDay,
+            time_seconds: Math.round(this.timeSpent)
+        });
+        
+        // Reset time spent after saving
+        this.timeSpent = 0;
+    }
+}
     }
     
     /**

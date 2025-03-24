@@ -1043,3 +1043,430 @@
     --skillsprint-border-radius: 4px;
     --skillsprint-transition: all 0.2s ease-in-out;
 }
+
+
+/**
+ * Quiz-specific styles
+ *
+ * @package    SkillSprint
+ * @subpackage SkillSprint/public/css
+ */
+
+/* Quiz Container */
+.skillsprint-quiz {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    margin: 30px 0;
+    overflow: hidden;
+}
+
+.skillsprint-quiz-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    padding: 20px 25px;
+}
+
+.skillsprint-quiz-title {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 10px;
+}
+
+.skillsprint-quiz-description {
+    color: #555;
+    font-size: 16px;
+    margin-bottom: 15px;
+}
+
+.skillsprint-quiz-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 15px;
+}
+
+.skillsprint-quiz-meta-item {
+    align-items: center;
+    color: #666;
+    display: flex;
+    font-size: 14px;
+}
+
+.skillsprint-quiz-meta-item i {
+    color: var(--skillsprint-primary);
+    margin-right: 6px;
+}
+
+/* Quiz Form */
+.skillsprint-quiz-form {
+    padding: 25px;
+}
+
+.skillsprint-quiz-message {
+    background-color: #fff3cd;
+    border-left: 4px solid #ffc107;
+    border-radius: 4px;
+    color: #664d03;
+    margin-bottom: 20px;
+    padding: 12px 15px;
+}
+
+.skillsprint-quiz-message.error {
+    background-color: #f8d7da;
+    border-left-color: #dc3545;
+    color: #842029;
+}
+
+.skillsprint-quiz-message.success {
+    background-color: #d1e7dd;
+    border-left-color: #198754;
+    color: #0f5132;
+}
+
+/* Questions */
+.skillsprint-question {
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    padding: 20px;
+}
+
+.skillsprint-question:last-child {
+    margin-bottom: 0;
+}
+
+.skillsprint-question-text {
+    font-size: 18px;
+    font-weight: 500;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.skillsprint-question-options {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.skillsprint-question-option {
+    margin-bottom: 12px;
+    position: relative;
+}
+
+.skillsprint-question-option:last-child {
+    margin-bottom: 0;
+}
+
+.skillsprint-question-option label {
+    align-items: center;
+    background-color: #f8f9fa;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    padding: 12px 15px;
+    transition: all 0.2s ease;
+}
+
+.skillsprint-question-option label:hover {
+    background-color: #e9ecef;
+}
+
+.skillsprint-question-option input[type="radio"],
+.skillsprint-question-option input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+.skillsprint-question-option.correct {
+    background-color: rgba(25, 135, 84, 0.1);
+    border-color: #198754;
+}
+
+.skillsprint-question-option.correct:after {
+    content: "✓";
+    color: #198754;
+    font-size: 18px;
+    font-weight: bold;
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.skillsprint-question-option.incorrect {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-color: #dc3545;
+}
+
+.skillsprint-question-option.incorrect:after {
+    content: "✕";
+    color: #dc3545;
+    font-size: 18px;
+    font-weight: bold;
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+/* Matching questions */
+.skillsprint-question-options.matching {
+    display: grid;
+    gap: 12px;
+    grid-template-columns: 1fr;
+}
+
+.skillsprint-question-options.matching .skillsprint-question-option {
+    display: grid;
+    gap: 15px;
+    grid-template-columns: 1fr 1fr;
+}
+
+.skillsprint-question-options.matching .matching-left {
+    background-color: #e9ecef;
+    border-radius: 4px;
+    font-weight: 500;
+    padding: 10px;
+}
+
+.skillsprint-question-options.matching select {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 8px 10px;
+    width: 100%;
+}
+
+/* Short answer questions */
+.skillsprint-question-option input[type="text"] {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 10px 12px;
+    width: 100%;
+}
+
+/* Question feedback */
+.skillsprint-question-feedback {
+    background-color: #f8f9fa;
+    border-left: 4px solid #6c757d;
+    border-radius: 4px;
+    margin-top: 15px;
+    padding: 12px 15px;
+}
+
+.skillsprint-question-feedback.correct {
+    background-color: rgba(25, 135, 84, 0.1);
+    border-left-color: #198754;
+    color: #0f5132;
+}
+
+.skillsprint-question-feedback.incorrect {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-left-color: #dc3545;
+    color: #842029;
+}
+
+.skillsprint-question-points {
+    color: #6c757d;
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: right;
+}
+
+/* Quiz footer */
+.skillsprint-quiz-footer {
+    border-top: 1px solid #e9ecef;
+    margin-top: 20px;
+    padding-top: 20px;
+    text-align: center;
+}
+
+/* Results Panel */
+.skillsprint-quiz-result {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    margin: 20px 0;
+    padding: 25px;
+}
+
+.skillsprint-quiz-result-inner {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.skillsprint-quiz-result-header {
+    background: linear-gradient(135deg, var(--skillsprint-primary), var(--skillsprint-secondary));
+    color: white;
+    padding: 20px 25px;
+    text-align: center;
+}
+
+.skillsprint-quiz-result-title {
+    font-size: 22px;
+    font-weight: 600;
+    margin: 0 0 15px;
+}
+
+.skillsprint-quiz-result-score {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.skillsprint-quiz-result-percentage {
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    height: 80px;
+    justify-content: center;
+    margin: 0 auto;
+    width: 80px;
+}
+
+.skillsprint-quiz-result-percentage .percentage {
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.skillsprint-quiz-result-correct {
+    font-size: 16px;
+}
+
+.skillsprint-quiz-result-feedback {
+    padding: 20px 25px;
+}
+
+.skillsprint-quiz-result-feedback p {
+    font-size: 16px;
+    margin-top: 0;
+    text-align: center;
+}
+
+.skillsprint-quiz-score-details {
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    list-style: none;
+    margin: 20px 0;
+    padding: 0;
+}
+
+.skillsprint-quiz-score-details li {
+    border-bottom: 1px solid #e9ecef;
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 15px;
+}
+
+.skillsprint-quiz-score-details li:last-child {
+    border-bottom: none;
+}
+
+.skillsprint-quiz-result-actions {
+    background-color: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    padding: 20px 25px;
+}
+
+/* Animation for loading spinner */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.spinning {
+    animation: spin 2s linear infinite;
+    display: inline-block;
+}
+
+
+/**
+ * Achievement notification styles
+ */
+ .skillsprint-achievement-notification {
+    background-color: white;
+    border-radius: 8px;
+    bottom: 20px;
+    box-shadow: 0 5px 30px rgba(0, 0, 0, 0.15);
+    display: flex;
+    max-width: 400px;
+    opacity: 0;
+    padding: 15px;
+    position: fixed;
+    right: 20px;
+    transform: translateY(30px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 999999;
+}
+
+.skillsprint-achievement-notification.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.skillsprint-achievement-icon {
+    flex-shrink: 0;
+    height: 60px;
+    margin-right: 15px;
+    width: 60px;
+}
+
+.skillsprint-achievement-icon img {
+    height: auto;
+    max-width: 100%;
+}
+
+.skillsprint-achievement-content {
+    flex: 1;
+}
+
+.skillsprint-achievement-content h3 {
+    color: var(--skillsprint-primary);
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 5px;
+}
+
+.skillsprint-achievement-name {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.skillsprint-achievement-description {
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 5px;
+}
+
+.skillsprint-achievement-points {
+    color: var(--skillsprint-success);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.skillsprint-achievement-close {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 20px;
+    height: 20px;
+    line-height: 1;
+    padding: 0;
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    width: 20px;
+}
+
+.skillsprint-achievement-close:hover {
+    color: #333;
+}

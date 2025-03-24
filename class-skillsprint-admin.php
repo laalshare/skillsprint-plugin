@@ -228,6 +228,18 @@ class SkillSprint_Admin {
      *
      * @since    1.0.0
      */
+
+
+     public function add_blueprint_access_metabox() {
+        add_meta_box(
+            'skillsprint_blueprint_access',
+            __('Access Control', 'skillsprint'),
+            array($this, 'render_blueprint_access_metabox'),
+            'blueprint',
+            'side',
+            'default'
+        );
+    }
     public function add_meta_boxes() {
         // Blueprint Days Metabox
         add_meta_box(
@@ -909,5 +921,99 @@ class SkillSprint_Admin {
         $value = isset($settings['max_quiz_attempts']) ? $settings['max_quiz_attempts'] : 3;
         echo '<input type="number" min="1" name="skillsprint_settings[max_quiz_attempts]" value="' . esc_attr($value) . '" /> ';
         echo '<p class="description">' . __('Default maximum number of attempts for quizzes.', 'skillsprint') . '</p>';
+    }
+
+    public function render_blueprint_access_metabox($post) {
+        wp_nonce_field('skillsprint_blueprint_access_metabox', 'skillsprint_blueprint_access_nonce');
+        
+        $restrict_access = get_post_meta($post->ID, '_skillsprint_restrict_access', true);
+        $allowed_roles = get_post_meta($post->ID, '_skillsprint_allowed_roles', true);
+        
+        if (!is_array($allowed_roles)) {
+            $allowed_roles = array();
+        }
+        
+        // Get all roles
+        $roles = get_editable_roles();
+        ?>
+        
+        <p>
+            <label><input type="radio" name="skillsprint_restrict_access" value="open" <?php checked($restrict_access, 'open'); ?> <?php checked($restrict_access, ''); ?>> 
+            <?php _e('Open Access (Everyone)', 'skillsprint'); ?></label>
+        </p>
+        
+        <p>
+            <label><input type="radio" name="skillsprint_restrict_access" value="members" <?php checked($restrict_access, 'members'); ?>> 
+            <?php _e('Members Only (Any registered user)', 'skillsprint'); ?></label>
+        </p>
+        
+        <p>
+            <label><input type="radio" name="skillsprint_restrict_access" value="specific_roles" <?php checked($restrict_access, 'specific_roles'); ?>> 
+            <?php _e('Specific Roles Only', 'skillsprint'); ?></label>
+        </p>
+        
+        <div class="skillsprint-roles-selector" style="<?php echo $restrict_access === 'specific_roles' ? '' : 'display: none;'; ?> margin-left: 20px; margin-top: 10px;">
+            <?php foreach ($roles as $role_key => $role) : ?>
+                <p>
+                    <label>
+                        <input type="checkbox" name="skillsprint_allowed_roles[]" value="<?php echo esc_attr($role_key); ?>" 
+                            <?php checked(in_array($role_key, $allowed_roles)); ?>>
+                        <?php echo esc_html($role['name']); ?>
+                    </label>
+                </p>
+            <?php endforeach; ?>
+        </div>
+        
+        <script>
+            jQuery(document).ready(function($) {
+                $('input[name="skillsprint_restrict_access"]').on('change', function() {
+                    if ($(this).val() === 'specific_roles') {
+                        $('.skillsprint-roles-selector').show();
+                    } else {
+                        $('.skillsprint-roles-selector').hide();
+                    }
+                });
+            });
+        </script>
+        <?php
+    }
+    
+    /**
+     * Save the blueprint access metabox data
+     * 
+     * @param int $post_id The post ID
+     */
+    public function save_blueprint_access_metabox($post_id) {
+        // Check if our nonce is set
+        if (!isset($_POST['skillsprint_blueprint_access_nonce'])) {
+            return;
+        }
+        
+        // Verify the nonce
+        if (!wp_verify_nonce($_POST['skillsprint_blueprint_access_nonce'], 'skillsprint_blueprint_access_metabox')) {
+            return;
+        }
+        
+        // Check user permissions
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+        
+        // Save restrict access setting
+        if (isset($_POST['skillsprint_restrict_access'])) {
+            update_post_meta($post_id, '_skillsprint_restrict_access', sanitize_text_field($_POST['skillsprint_restrict_access']));
+        } else {
+            update_post_meta($post_id, '_skillsprint_restrict_access', 'open');
+        }
+        
+        // Save allowed roles if specific roles is selected
+        if (isset($_POST['skillsprint_restrict_access']) && $_POST['skillsprint_restrict_access'] === 'specific_roles') {
+            if (isset($_POST['skillsprint_allowed_roles']) && is_array($_POST['skillsprint_allowed_roles'])) {
+                $sanitized_roles = array_map('sanitize_text_field', $_POST['skillsprint_allowed_roles']);
+                update_post_meta($post_id, '_skillsprint_allowed_roles', $sanitized_roles);
+            } else {
+                update_post_meta($post_id, '_skillsprint_allowed_roles', array());
+            }
+        }
     }
 }

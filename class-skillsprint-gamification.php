@@ -17,52 +17,52 @@
 class SkillSprint_Gamification {
 
     /**
- * Award points for completing a day.
- *
- * @since    1.0.0
- * @param    int    $user_id      The user ID.
- * @param    int    $blueprint_id The blueprint ID.
- * @param    int    $day_number   The day number.
- */
-public function award_day_completion_points($user_id, $blueprint_id, $day_number) {
-    // Get settings
-    $settings = get_option('skillsprint_settings');
-    
-    // Check if gamification is enabled
-    if (!isset($settings['gamification_enabled']) || !$settings['gamification_enabled']) {
-        return;
+     * Award points for completing a day.
+     *
+     * @since    1.0.0
+     * @param    int    $user_id      The user ID.
+     * @param    int    $blueprint_id The blueprint ID.
+     * @param    int    $day_number   The day number.
+     */
+    public function award_day_completion_points($user_id, $blueprint_id, $day_number) {
+        // Get settings
+        $settings = get_option('skillsprint_settings');
+        
+        // Check if gamification is enabled
+        if (!isset($settings['gamification_enabled']) || !$settings['gamification_enabled']) {
+            return;
+        }
+        
+        $points_per_day = isset($settings['points_per_day_completion']) ? intval($settings['points_per_day_completion']) : 10;
+        
+        if ($points_per_day <= 0) {
+            return;
+        }
+        
+        // Get streak info for potential bonus
+        $streak_info = SkillSprint_DB::get_user_streak($user_id);
+        $streak_bonus_multiplier = isset($settings['streak_bonus_multiplier']) ? floatval($settings['streak_bonus_multiplier']) : 1.5;
+        $current_streak = isset($streak_info['current_streak']) ? intval($streak_info['current_streak']) : 0;
+        
+        // Calculate points
+        $points = $points_per_day;
+        $description = sprintf(__('Completed Day %d of blueprint: %s', 'skillsprint'), $day_number, get_the_title($blueprint_id));
+        
+        // Add streak bonus if streak is active
+        if ($current_streak >= 3 && $streak_bonus_multiplier > 1) {
+            $points = round($points * $streak_bonus_multiplier);
+            $description .= sprintf(__(' (includes %dx streak bonus)', 'skillsprint'), $streak_bonus_multiplier);
+        }
+        
+        // Award points
+        SkillSprint_DB::add_user_points(
+            $user_id,
+            $points,
+            'day_completion',
+            $description,
+            $blueprint_id
+        );
     }
-    
-    $points_per_day = isset($settings['points_per_day_completion']) ? intval($settings['points_per_day_completion']) : 10;
-    
-    if ($points_per_day <= 0) {
-        return;
-    }
-    
-    // Get streak info for potential bonus
-    $streak_info = SkillSprint_DB::get_user_streak($user_id);
-    $streak_bonus_multiplier = isset($settings['streak_bonus_multiplier']) ? floatval($settings['streak_bonus_multiplier']) : 1.5;
-    $current_streak = isset($streak_info['current_streak']) ? intval($streak_info['current_streak']) : 0;
-    
-    // Calculate points
-    $points = $points_per_day;
-    $description = sprintf(__('Completed Day %d of blueprint: %s', 'skillsprint'), $day_number, get_the_title($blueprint_id));
-    
-    // Add streak bonus if streak is active
-    if ($current_streak >= 3 && $streak_bonus_multiplier > 1) {
-        $points = round($points * $streak_bonus_multiplier);
-        $description .= sprintf(__(' (includes %dx streak bonus)', 'skillsprint'), $streak_bonus_multiplier);
-    }
-    
-    // Award points
-    SkillSprint_DB::add_user_points(
-        $user_id,
-        $points,
-        'day_completion',
-        $description,
-        $blueprint_id
-    );
-}
     
     /**
      * Award points for completing a quiz.
@@ -409,4 +409,284 @@ public function award_day_completion_points($user_id, $blueprint_id, $day_number
             'leaderboard' => $leaderboard
         ) );
     }
+
+
+    /**
+ * Get badge info for an achievement
+ *
+ * @param string $achievement_id Achievement ID
+ * @return array Badge info
+ */
+public function get_badge_info($achievement_id) {
+    $badges = $this->get_all_badges();
+    
+    if (isset($badges[$achievement_id])) {
+        return $badges[$achievement_id];
+    }
+    
+    // Check for category badges
+    if (strpos($achievement_id, 'category_master_') === 0) {
+        $category_id = str_replace('category_master_', '', $achievement_id);
+        $category = get_term($category_id, 'blueprint_category');
+        
+        if ($category && !is_wp_error($category)) {
+            return array(
+                'name' => sprintf(__('%s Expert', 'skillsprint'), $category->name),
+                'description' => sprintf(__('Completed 3 blueprints in the %s category', 'skillsprint'), $category->name),
+                'icon' => 'badge-category',
+                'points' => 50
+            );
+        }
+    }
+    
+    return array(
+        'name' => __('Achievement', 'skillsprint'),
+        'description' => __('Unlocked achievement', 'skillsprint'),
+        'icon' => 'badge-default',
+        'points' => 10
+    );
+}
+
+/**
+ * Get all available badges
+ *
+ * @return array All badges
+ */
+public function get_all_badges() {
+    return array(
+        'first_day_completed' => array(
+            'name' => __('First Step', 'skillsprint'),
+            'description' => __('Completed your first day', 'skillsprint'),
+            'icon' => 'badge-first-step',
+            'points' => 10
+        ),
+        'days_completed_5' => array(
+            'name' => __('Enthusiast', 'skillsprint'),
+            'description' => __('Completed 5 days', 'skillsprint'),
+            'icon' => 'badge-enthusiast',
+            'points' => 25
+        ),
+        'days_completed_10' => array(
+            'name' => __('Dedicated Learner', 'skillsprint'),
+            'description' => __('Completed 10 days', 'skillsprint'),
+            'icon' => 'badge-dedicated',
+            'points' => 50
+        ),
+        'days_completed_25' => array(
+            'name' => __('Learning Machine', 'skillsprint'),
+            'description' => __('Completed 25 days', 'skillsprint'),
+            'icon' => 'badge-machine',
+            'points' => 100
+        ),
+        'days_completed_50' => array(
+            'name' => __('Knowledge Seeker', 'skillsprint'),
+            'description' => __('Completed 50 days', 'skillsprint'),
+            'icon' => 'badge-seeker',
+            'points' => 200
+        ),
+        'days_completed_100' => array(
+            'name' => __('Mastermind', 'skillsprint'),
+            'description' => __('Completed 100 days', 'skillsprint'),
+            'icon' => 'badge-mastermind',
+            'points' => 500
+        ),
+        'first_blueprint_completed' => array(
+            'name' => __('Blueprint Finisher', 'skillsprint'),
+            'description' => __('Completed your first blueprint', 'skillsprint'),
+            'icon' => 'badge-finisher',
+            'points' => 50
+        ),
+        'blueprints_completed_3' => array(
+            'name' => __('Blueprint Collector', 'skillsprint'),
+            'description' => __('Completed 3 blueprints', 'skillsprint'),
+            'icon' => 'badge-collector',
+            'points' => 100
+        ),
+        'blueprints_completed_5' => array(
+            'name' => __('Blueprint Expert', 'skillsprint'),
+            'description' => __('Completed 5 blueprints', 'skillsprint'),
+            'icon' => 'badge-expert',
+            'points' => 200
+        ),
+        'blueprints_completed_10' => array(
+            'name' => __('Blueprint Master', 'skillsprint'),
+            'description' => __('Completed 10 blueprints', 'skillsprint'),
+            'icon' => 'badge-master',
+            'points' => 500
+        ),
+        'streak_3' => array(
+            'name' => __('Consistent', 'skillsprint'),
+            'description' => __('3-day learning streak', 'skillsprint'),
+            'icon' => 'badge-consistent',
+            'points' => 15
+        ),
+        'streak_7' => array(
+            'name' => __('Weekly Champion', 'skillsprint'),
+            'description' => __('7-day learning streak', 'skillsprint'),
+            'icon' => 'badge-weekly',
+            'points' => 50
+        ),
+        'streak_14' => array(
+            'name' => __('Biweekly Hero', 'skillsprint'),
+            'description' => __('14-day learning streak', 'skillsprint'),
+            'icon' => 'badge-biweekly',
+            'points' => 100
+        ),
+        'streak_30' => array(
+            'name' => __('Monthly Devotee', 'skillsprint'),
+            'description' => __('30-day learning streak', 'skillsprint'),
+            'icon' => 'badge-monthly',
+            'points' => 300
+        ),
+        'perfect_quiz' => array(
+            'name' => __('Perfect Score', 'skillsprint'),
+            'description' => __('Got 100% on a quiz', 'skillsprint'),
+            'icon' => 'badge-perfect',
+            'points' => 25
+        ),
+        'quiz_master' => array(
+            'name' => __('Quiz Master', 'skillsprint'),
+            'description' => __('Completed 10 quizzes', 'skillsprint'),
+            'icon' => 'badge-quiz',
+            'points' => 100
+        )
+    );
+}
+
+/**
+ * Award achievement
+ *
+ * @param int $user_id User ID
+ * @param string $achievement_id Achievement ID
+ * @param array $meta Additional metadata
+ * @return bool Success status
+ */
+public function award_achievement($user_id, $achievement_id, $meta = array()) {
+    // Check if user already has this achievement
+    $existing = SkillSprint_DB::get_user_achievement($user_id, $achievement_id);
+    
+    if ($existing) {
+        return false; // Already awarded
+    }
+    
+    // Get badge info
+    $badge = $this->get_badge_info($achievement_id);
+    
+    // Award achievement
+    $added = SkillSprint_DB::add_user_achievement($user_id, $achievement_id, $meta);
+    
+    if ($added) {
+        // Award points for achievement
+        if (!empty($badge['points'])) {
+            SkillSprint_DB::add_user_points(
+                $user_id,
+                $badge['points'],
+                'achievement',
+                sprintf(__('Earned achievement: %s', 'skillsprint'), $badge['name'])
+            );
+        }
+        
+        // Trigger action
+        do_action('skillsprint_achievement_awarded', $user_id, $achievement_id, $badge, $meta);
+    }
+    
+    return $added;
+}
+
+/**
+ * Check for perfect quiz achievement
+ *
+ * @param int $user_id User ID
+ * @param int $blueprint_id Blueprint ID
+ * @param string $quiz_id Quiz ID
+ * @param array $quiz_result Quiz result data
+ */
+public function check_perfect_quiz_achievement($user_id, $blueprint_id, $quiz_id, $quiz_result) {
+    // Award achievement for perfect score
+    if ($quiz_result['score_percentage'] == 100) {
+        $this->award_achievement($user_id, 'perfect_quiz', array(
+            'blueprint_id' => $blueprint_id,
+            'quiz_id' => $quiz_id,
+            'score' => 100
+        ));
+    }
+    
+    // Count completed quizzes
+    global $wpdb;
+    $quiz_table = $wpdb->prefix . 'skillsprint_quiz_responses';
+    
+    $completed_quizzes = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT COUNT(DISTINCT CONCAT(blueprint_id, '_', quiz_id)) 
+            FROM $quiz_table 
+            WHERE user_id = %d 
+            GROUP BY user_id",
+            $user_id
+        )
+    );
+    
+    // Award quiz master achievement
+    if ($completed_quizzes == 10) {
+        $this->award_achievement($user_id, 'quiz_master', array(
+            'quizzes_completed' => 10
+        ));
+    }
+}
+
+/**
+ * Display achievement notification
+ *
+ * @param int $user_id User ID
+ * @param string $achievement_id Achievement ID
+ * @param array $badge Badge info
+ * @param array $meta Achievement metadata
+ */
+public function display_achievement_notification($user_id, $achievement_id, $badge, $meta) {
+    // Only show for current user
+    if ($user_id != get_current_user_id()) {
+        return;
+    }
+    
+    // Build notification HTML
+    $notification = '<div class="skillsprint-achievement-notification">';
+    $notification .= '<div class="skillsprint-achievement-icon"><img src="' . SKILLSPRINT_PLUGIN_URL . 'public/images/badges/' . $badge['icon'] . '.png" alt="' . esc_attr($badge['name']) . '"></div>';
+    $notification .= '<div class="skillsprint-achievement-content">';
+    $notification .= '<h3>' . __('Achievement Unlocked!', 'skillsprint') . '</h3>';
+    $notification .= '<div class="skillsprint-achievement-name">' . esc_html($badge['name']) . '</div>';
+    $notification .= '<div class="skillsprint-achievement-description">' . esc_html($badge['description']) . '</div>';
+    $notification .= '<div class="skillsprint-achievement-points">+' . intval($badge['points']) . ' ' . __('points', 'skillsprint') . '</div>';
+    $notification .= '</div>';
+    $notification .= '<button class="skillsprint-achievement-close">&times;</button>';
+    $notification .= '</div>';
+    
+    // Add to footer with JavaScript
+    add_action('wp_footer', function() use ($notification) {
+        echo '<script>
+            jQuery(document).ready(function($) {
+                $("body").append(\'' . str_replace("'", "\'", $notification) . '\');
+                
+                // Show notification with animation
+                setTimeout(function() {
+                    $(".skillsprint-achievement-notification").addClass("active");
+                }, 500);
+                
+                // Auto-hide after 5 seconds
+                setTimeout(function() {
+                    $(".skillsprint-achievement-notification").removeClass("active");
+                    setTimeout(function() {
+                        $(".skillsprint-achievement-notification").remove();
+                    }, 500);
+                }, 5000);
+                
+                // Close button
+                $(".skillsprint-achievement-close").on("click", function() {
+                    $(".skillsprint-achievement-notification").removeClass("active");
+                    setTimeout(function() {
+                        $(".skillsprint-achievement-notification").remove();
+                    }, 500);
+                });
+            });
+        </script>';
+    });
+}
 }

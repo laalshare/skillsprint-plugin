@@ -23,6 +23,18 @@ define('SKILLSPRINT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SKILLSPRINT_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('SKILLSPRINT_DB_VERSION', '1.0.0');
 
+
+add_action('skillsprint_day_completed', array($this, 'day_completed_hook'), 10, 3);
+add_action('skillsprint_blueprint_completed', array($this, 'blueprint_completed_hook'), 10, 2);
+add_action('skillsprint_achievement_awarded', array($this, 'achievement_awarded_hook'), 10, 4);
+add_action('skillsprint_quiz_completed', array($this, 'quiz_completed_hook'), 10, 4);
+add_action('skillsprint_points_added', array($this, 'points_added_hook'), 10, 4);
+
+// Custom filters
+add_filter('skillsprint_can_access_day', array($this, 'can_access_day_filter'), 10, 4);
+add_filter('skillsprint_quiz_result', array($this, 'filter_quiz_result'), 10, 3);
+add_filter('skillsprint_badge_info', array($this, 'filter_badge_info'), 10, 2);
+
 /**
  * The code that runs during plugin activation.
  */
@@ -340,7 +352,280 @@ class SkillSprint {
             }
         }
         return $template;
+    
+    
     }
+
+
+    /**
+ * Hook callback for day completion
+ * 
+ * @param int $user_id User ID
+ * @param int $blueprint_id Blueprint ID
+ * @param int $day_number Day number
+ */
+public function day_completed_hook($user_id, $blueprint_id, $day_number) {
+    // This hook is called when a user completes a day
+    // Useful for integration with other systems, notifications, etc.
+    
+    // Get day information
+    $day_data = SkillSprint_DB::get_blueprint_day_data($blueprint_id, $day_number);
+    $blueprint_title = get_the_title($blueprint_id);
+    
+    // Log completion
+    do_action('skillsprint_log', 
+        sprintf(
+            __('User %d completed Day %d of %s', 'skillsprint'),
+            $user_id,
+            $day_number,
+            $blueprint_title
+        )
+    );
+    
+    // Allow other plugins to hook into this event
+    do_action('skillsprint_day_completed_extra', $user_id, $blueprint_id, $day_number, $day_data);
+}
+
+/**
+ * Hook callback for blueprint completion
+ * 
+ * @param int $user_id User ID
+ * @param int $blueprint_id Blueprint ID
+ */
+public function blueprint_completed_hook($user_id, $blueprint_id) {
+    // This hook is called when a user completes an entire blueprint
+    
+    // Get blueprint information
+    $blueprint_title = get_the_title($blueprint_id);
+    $blueprint_author = get_post_field('post_author', $blueprint_id);
+    
+    // Log completion
+    do_action('skillsprint_log', 
+        sprintf(
+            __('User %d completed blueprint %s', 'skillsprint'),
+            $user_id,
+            $blueprint_title
+        )
+    );
+    
+    // Send notification to blueprint author
+    if (apply_filters('skillsprint_notify_author_on_completion', true, $blueprint_id, $user_id)) {
+        $author_email = get_the_author_meta('user_email', $blueprint_author);
+        $user_data = get_userdata($user_id);
+        
+        if ($author_email && $user_data) {
+            $subject = sprintf(
+                __('[%s] %s completed your blueprint %s', 'skillsprint'),
+                get_bloginfo('name'),
+                $user_data->display_name,
+                $blueprint_title
+            );
+            
+            $message = sprintf(
+                __("Hello,\n\n%s has completed your blueprint \"%s\".\n\nYou can view their progress in the admin dashboard.\n\nBest regards,\n%s", 'skillsprint'),
+                $user_data->display_name,
+                $blueprint_title,
+                get_bloginfo('name')
+            );
+            
+            wp_mail($author_email, $subject, $message);
+        }
+    }
+    
+    // Allow other plugins to hook into this event
+    do_action('skillsprint_blueprint_completed_extra', $user_id, $blueprint_id);
+}
+
+/**
+ * Hook callback for achievement awarded
+ * 
+ * @param int $user_id User ID
+ * @param string $achievement_id Achievement ID
+ * @param array $badge Badge info
+ * @param array $meta Achievement metadata
+ */
+public function achievement_awarded_hook($user_id, $achievement_id, $badge, $meta) {
+    // This hook is called when a user earns an achievement
+    
+    // Log achievement
+    do_action('skillsprint_log', 
+        sprintf(
+            __('User %d earned achievement %s', 'skillsprint'),
+            $user_id,
+            $badge['name']
+        )
+    );
+    
+    // Display achievement notification
+    if (apply_filters('skillsprint_show_achievement_notification', true, $user_id, $achievement_id)) {
+        $gamification = new SkillSprint_Gamification();
+        $gamification->display_achievement_notification($user_id, $achievement_id, $badge, $meta);
+    }
+}
+
+/**
+ * Hook callback for quiz completion
+ * 
+ * @param int $user_id User ID
+ * @param int $blueprint_id Blueprint ID
+ * @param string $quiz_id Quiz ID
+ * @param bool $passed Whether the quiz was passed
+ */
+public function quiz_completed_hook($user_id, $blueprint_id, $quiz_id, $passed) {
+    // Get quiz information
+    $quiz_data = get_post_meta($blueprint_id, '_skillsprint_quiz_' . $quiz_id, true);
+    $quiz_title = isset($quiz_data['title']) ? $quiz_data['title'] : $quiz_id;
+    $blueprint_title = get_the_title($blueprint_id);
+    
+    // Log quiz completion
+    do_action('skillsprint_log', 
+        sprintf(
+            __('User %d %s quiz %s in blueprint %s', 'skillsprint'),
+            $user_id,
+            $passed ? __('passed', 'skillsprint') : __('failed', 'skillsprint'),
+            $quiz_title,
+            $blueprint_title
+        )
+    );
+    
+    // Check for achievements
+    if ($passed) {
+        $gamification = new SkillSprint_Gamification();
+        
+        // Get quiz score
+        $quiz_result = SkillSprint_DB::calculate_quiz_score($user_id, $blueprint_id, $quiz_id);
+        
+        // Check for perfect quiz achievement
+        $gamification->check_perfect_quiz_achievement($user_id, $blueprint_id, $quiz_id, $quiz_result);
+    }
+    
+    // Allow other plugins to hook into this event
+    do_action('skillsprint_quiz_completed_extra', $user_id, $blueprint_id, $quiz_id, $passed, $quiz_data);
+}
+
+/**
+ * Hook callback for points added
+ * 
+ * @param int $user_id User ID
+ * @param int $points Points amount
+ * @param string $source Points source
+ * @param int $blueprint_id Blueprint ID (optional)
+ */
+public function points_added_hook($user_id, $points, $source, $blueprint_id) {
+    // This hook is called when points are added to a user
+    
+    // Log points
+    do_action('skillsprint_log', 
+        sprintf(
+            __('User %d earned %d points from %s', 'skillsprint'),
+            $user_id,
+            $points,
+            $source
+        )
+    );
+    
+    // Update user ranking
+    $this->update_user_ranking($user_id);
+    
+    // Allow other plugins to hook into this event
+    do_action('skillsprint_points_added_extra', $user_id, $points, $source, $blueprint_id);
+}
+
+/**
+ * Filter for day access control
+ * 
+ * @param bool $can_access Default access status
+ * @param int $user_id User ID
+ * @param int $blueprint_id Blueprint ID
+ * @param int $day_number Day number
+ * @return bool Updated access status
+ */
+public function can_access_day_filter($can_access, $user_id, $blueprint_id, $day_number) {
+    // Allow plugins to override the default access control
+    
+    // Example: Check if blueprint belongs to a premium membership
+    if (function_exists('is_premium_blueprint') && is_premium_blueprint($blueprint_id)) {
+        // Check if user has premium membership
+        if (function_exists('user_has_premium_membership') && !user_has_premium_membership($user_id)) {
+            return false;
+        }
+    }
+    
+    return $can_access;
+}
+
+/**
+ * Filter for quiz results
+ * 
+ * @param array $result Quiz result data
+ * @param int $user_id User ID
+ * @param int $blueprint_id Blueprint ID
+ * @return array Updated result data
+ */
+public function filter_quiz_result($result, $user_id, $blueprint_id) {
+    // Allow plugins to modify quiz results
+    
+    // Example: Add bonus points for speed
+    if (isset($result['time_taken']) && $result['time_taken'] < 60) { // Completed in less than 60 seconds
+        $result['points'] += 5; // Add 5 bonus points
+        $result['bonus_points'] = 5;
+        $result['bonus_reason'] = __('Speed bonus', 'skillsprint');
+    }
+    
+    return $result;
+}
+
+/**
+ * Filter for badge information
+ * 
+ * @param array $badge Badge info
+ * @param string $achievement_id Achievement ID
+ * @return array Updated badge info
+ */
+public function filter_badge_info($badge, $achievement_id) {
+    // Allow plugins to modify badge information
+    
+    // Example: Enhance certain badges for special events
+    if (function_exists('is_special_event_active') && is_special_event_active()) {
+        // Double points for badges during special events
+        $badge['points'] *= 2;
+        $badge['name'] = '⭐ ' . $badge['name']; // Add star to badge name
+    }
+    
+    return $badge;
+}
+
+/**
+ * Update user ranking
+ * 
+ * @param int $user_id User ID
+ */
+private function update_user_ranking() {
+    // Calculate rankings based on points
+    global $wpdb;
+    
+    $points_table = $wpdb->prefix . 'skillsprint_user_points';
+    
+    // Get all users with points
+    $users_with_points = $wpdb->get_results(
+        "SELECT user_id, SUM(points) as total_points
+        FROM $points_table
+        GROUP BY user_id
+        ORDER BY total_points DESC",
+        ARRAY_A
+    );
+    
+    // Update ranking metadata for each user
+    foreach ($users_with_points as $index => $user) {
+        $rank = $index + 1;
+        update_user_meta($user['user_id'], '_skillsprint_rank', $rank);
+        update_user_meta($user['user_id'], '_skillsprint_total_points', $user['total_points']);
+    }
+}
+
+
+
+
 }
 
 // Initialize plugin
